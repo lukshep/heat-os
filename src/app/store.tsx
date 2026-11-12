@@ -1,8 +1,11 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
 import type { AppState, ID } from '../data/model';
-import { reduce, type Action, type TaskPatch } from '../data/reducer';
+import { reduce, type Action, type ItemPatch } from '../data/reducer';
+import { routineDays, routineWarmth, type ListItem } from '../data/selectors';
 import type { StorageAdapter } from '../data/storage';
 import type { HeatConfig } from '../heat/config';
+import { addDays } from '../heat/day';
+import { isScheduledOn } from '../heat/warmth';
 import { clock, localDayKey } from './clock';
 
 export interface AppStore {
@@ -31,13 +34,18 @@ export function createStore(initial: AppState): AppStore {
   };
 }
 
-/** What the screens can do. Each call stamps its own id and time, which keeps the reducer pure. */
+/**
+ * What the screens can do. Each call stamps its own id and time, and works out anything
+ * that depends on the HEAT config, which keeps the reducer pure.
+ */
 export interface Actions {
   addTask(title: string, areaId: ID | null): void;
-  updateTask(id: ID, patch: TaskPatch): void;
-  deleteTask(id: ID): void;
+  updateItem(item: ListItem, patch: ItemPatch): void;
+  deleteItem(item: ListItem): void;
+  /** Sets the weekdays an item repeats on. Any days make it a routine; none make it a one-off task. */
+  setDays(item: ListItem, days: number[]): void;
   /** Returns the completion's id, which is what undo needs. */
-  completeTask(taskId: ID): ID;
+  complete(item: ListItem): ID;
   undoCompletion(completionId: ID): void;
   addArea(name: string): void;
   renameArea(id: ID, name: string): void;
@@ -49,24 +57,67 @@ export interface Actions {
 
 export function createActions(store: AppStore, config: HeatConfig): Actions {
   const newId = (): ID => crypto.randomUUID();
+  const dayOf = (at: number) => localDayKey(at, config.dayStartHour);
+
   return {
     addTask: (title, areaId) => store.dispatch({ type: 'task/add', id: newId(), at: clock.touch(), title, areaId }),
-    updateTask: (id, patch) => store.dispatch({ type: 'task/update', id, at: clock.touch(), patch }),
-    deleteTask: (id) => store.dispatch({ type: 'task/delete', id, at: clock.touch() }),
-    completeTask(taskId) {
+
+    updateItem(item, patch) {
+      const type = item.kind === 'task' ? 'task/update' : 'routine/update';
+      store.dispatch({ type, id: item.id, at: clock.touch(), patch });
+    },
+
+    deleteItem(item) {
+      const type = item.kind === 'task' ? 'task/delete' : 'routine/delete';
+      store.dispatch({ type, id: item.id, at: clock.touch() });
+    },
+
+    setDays(item, days) {
+      const at = clock.touch();
+      const today = dayOf(at);
+      const yesterday = addDays(today, -1);
+
+      if (item.kind === 'task') {
+        // A new routine starts cold, and today is its first day that can count.
+        if (days.length > 0) store.dispatch({ type: 'task/makeRoutine', id: item.id, at, days, asOf: yesterday });
+        return;
+      }
+      if (days.length === 0) return store.dispatch({ type: 'routine/makeTask', id: item.id, at });
+
+      const state = store.getState();
+      const routine = state.routines[item.id];
+      if (!routine) return;
+      // Settle everything up to yesterday under the old schedule; the new one applies from today.
+      const earned = routineWarmth(routine, routineDays(state).get(routine.id), today, config);
+      store.dispatch({ type: 'routine/setDays', id: routine.id, at, days, warmthBase: { ...earned, asOf: yesterday } });
+    },
+
+    complete(item) {
       const id = newId();
       const at = clock.touch();
-      store.dispatch({ type: 'task/complete', id, at, dayKey: localDayKey(at, config.dayStartHour), taskId });
+      const dayKey = dayOf(at);
+
+      if (item.kind === 'task') {
+        store.dispatch({ type: 'task/complete', id, at, dayKey, taskId: item.id });
+        return id;
+      }
+
+      const state = store.getState();
+      const routine = state.routines[item.id];
+      if (routine) {
+        // Worked out here, not taken from the row, in case the day turned over since it was drawn.
+        const { warmth } = routineWarmth(routine, routineDays(state).get(routine.id), dayKey, config);
+        const scheduled = isScheduledOn(routine.schedule, dayKey);
+        store.dispatch({ type: 'routine/complete', id, at, dayKey, routineId: routine.id, warmth, scheduled });
+      }
       return id;
     },
+
     undoCompletion: (id) => store.dispatch({ type: 'completion/undo', id, at: clock.touch() }),
     addArea: (name) => store.dispatch({ type: 'area/add', id: newId(), at: clock.touch(), name }),
     renameArea: (id, name) => store.dispatch({ type: 'area/rename', id, at: clock.touch(), name }),
     deleteArea: (id) => store.dispatch({ type: 'area/delete', id, at: clock.touch() }),
-    deferToday(taskId) {
-      const dayKey = localDayKey(clock.touch(), config.dayStartHour);
-      store.dispatch({ type: 'today/defer', dayKey, taskId });
-    },
+    deferToday: (taskId) => store.dispatch({ type: 'today/defer', dayKey: dayOf(clock.touch()), taskId }),
     replaceState: (state) => store.dispatch({ type: 'state/replace', state }),
   };
 }

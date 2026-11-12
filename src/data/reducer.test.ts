@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, SEED_AREA_NAMES, type AppState, type ID } from './model';
 import { reduce, type Action } from './reducer';
-import { deferredToday, liveAreas, liveCompletions, openTasks, tasksIn } from './selectors';
+import { deferredToday, inArea, liveAreas, liveCompletions, openTasks } from './selectors';
 
 const DAY_1 = '2026-01-05';
 const DAY_2 = '2026-01-06';
@@ -63,7 +63,7 @@ describe('tasks', () => {
     const [task] = openTasks(state);
     expect(task?.title).toBe('Call the dentist');
     expect(task?.areaId).toBeNull();
-    expect(tasksIn(openTasks(state), null)).toHaveLength(1);
+    expect(inArea(openTasks(state), null)).toHaveLength(1);
   });
 
   it('ignores a blank title', () => {
@@ -74,8 +74,8 @@ describe('tasks', () => {
     const start = fresh();
     const work = areaId(start, 'Work');
     const state = run(start, addTask('t1', 'Write report', work), addTask('t2', 'Stray', 'no-such-area'));
-    expect(tasksIn(openTasks(state), work).map((task) => task.id)).toEqual(['t1']);
-    expect(tasksIn(openTasks(state), null).map((task) => task.id)).toEqual(['t2']);
+    expect(inArea(openTasks(state), work).map((task) => task.id)).toEqual(['t1']);
+    expect(inArea(openTasks(state), null).map((task) => task.id)).toEqual(['t2']);
   });
 
   it('lists open tasks oldest first', () => {
@@ -212,7 +212,7 @@ describe('areas', () => {
     const work = areaId(start, 'Work');
     const state = run(start, addTask('t1', 'Report', work), { type: 'area/delete', id: work, at: 2500 });
     expect(liveAreas(state).map((area) => area.name)).not.toContain('Work');
-    expect(tasksIn(openTasks(state), null).map((task) => task.id)).toEqual(['t1']);
+    expect(inArea(openTasks(state), null).map((task) => task.id)).toEqual(['t1']);
   });
 });
 

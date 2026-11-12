@@ -12,7 +12,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | | **Checkpoint 1: tune the numbers** | In progress: first retune applied |
 | M3 | Phone prototype | Built 2026-11-12; not yet deployed or tried on an iPhone |
 | | **Checkpoint 2: use it for a week** | |
-| M4 | Routines | Not started |
+| M4 | Routines | Built 2026-11-12; not yet deployed or tried on an iPhone |
 | M5 | Nested projects | Not started |
 | M6 | Polish | Not started |
 
@@ -127,6 +127,19 @@ Use it for a week. Watch for the risks listed in `docs/SPEC.md`, especially triv
 ### M4 — Routines
 
 Weekday schedules, warmth, routines on Today.
+
+How it was built:
+
+- **A routine is a task that repeats.** The editor has a "Repeat on" row of weekday chips. Pressing any day turns a filed task into a routine; clearing them all turns it back into a one-off task. It keeps its id throughout, so the open editor does not jump.
+- **A routine needs an area.** An Inbox task has to be filed before it can repeat, and a routine cannot be moved to the Inbox.
+- **Today** lists every routine due today first, in the same order each day, then five tasks. Routines cannot be swapped away.
+- **On Projects** a routine stays in its area. Once done it shows a quiet check until tomorrow, and tapping the check takes the completion back.
+- **Off-schedule days** can still be completed from Projects. They earn HEAT and leave warmth alone.
+- **Changing the schedule** keeps the warmth earned so far and applies the new days from today.
+- **Deleting an area** turns its routines into one-off tasks in the Inbox.
+- **Weekday chips** follow the device's language and first day of the week.
+
+Verified in a desktop browser at phone size: making and unmaking a routine, completing from Today and from Projects, undo both ways, and warmth carrying into the next day (checked by moving a completion to yesterday in the saved data). Not verified on an iPhone.
 
 ### M5 — Nested projects
 

@@ -82,7 +82,17 @@ const SHAPES: Record<string, Record<string, Check>> = {
     important: isBoolean,
     avoided: isBoolean,
   },
-  routines: { ...META, title: isString, areaId: isString, important: isBoolean, avoided: isBoolean },
+  routines: {
+    ...META,
+    title: isString,
+    areaId: isString,
+    projectId: isStringOrNull,
+    important: isBoolean,
+    avoided: isBoolean,
+    schedule: (value) => isDict(value) && Array.isArray(value.days) && value.days.every(isNumber),
+    warmthBase: (value) =>
+      isDict(value) && isNumber(value.warmth) && isNumber(value.missRun) && isString(value.asOf),
+  },
   completions: {
     ...META,
     at: isNumber,

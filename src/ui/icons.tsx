@@ -18,6 +18,15 @@ export function PlusIcon() {
   );
 }
 
+/** Sits inside the ring of a routine that is done for the day. */
+export function CheckIcon() {
+  return (
+    <svg {...base} width={14} height={14} strokeWidth={3.5}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
 /** Two arrows chasing each other: swap this suggestion for another. */
 export function SwapIcon() {
   return (

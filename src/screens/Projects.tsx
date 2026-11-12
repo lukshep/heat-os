@@ -2,14 +2,14 @@ import { useRef, useState } from 'react';
 import { exportBackup, readBackup } from '../app/backup';
 import { useActions } from '../app/store';
 import type { View } from '../app/view';
-import type { Area, Task } from '../data/model';
-import { tasksIn } from '../data/selectors';
+import type { Area } from '../data/model';
+import { inArea, type ListItem } from '../data/selectors';
 import { AddInput } from '../ui/AddInput';
-import { TaskList } from './TaskList';
+import { ItemList } from './ItemList';
 
 interface Props {
   view: View;
-  onComplete: (task: Task) => void;
+  onComplete: (item: ListItem) => void;
 }
 
 export function Projects({ view, onComplete }: Props) {
@@ -32,7 +32,8 @@ function AreaSection({ area, view, onComplete }: Props & { area: Area }) {
   const actions = useActions();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(area.name);
-  const tasks = tasksIn(view.tasks, area.id);
+  // Routines first: they are the permanent part of an area. Then the tasks still to do.
+  const items = inArea(view.items, area.id);
 
   function finishRename() {
     if (name.trim()) actions.renameArea(area.id, name);
@@ -41,7 +42,8 @@ function AreaSection({ area, view, onComplete }: Props & { area: Area }) {
   }
 
   function remove() {
-    const warning = tasks.length > 0 ? ` Its ${tasks.length === 1 ? 'task moves' : 'tasks move'} to the Inbox.` : '';
+    const warning =
+      items.length > 0 ? ' Everything in it moves to the Inbox, and its routines become one-off tasks.' : '';
     if (window.confirm(`Delete ${area.name}?${warning}`)) actions.deleteArea(area.id);
   }
 
@@ -76,7 +78,7 @@ function AreaSection({ area, view, onComplete }: Props & { area: Area }) {
         </button>
       )}
 
-      <TaskList tasks={tasks} view={view} onComplete={onComplete} />
+      <ItemList items={items} view={view} onComplete={onComplete} routinesStay />
       <AddInput placeholder={`Add to ${area.name}`} onAdd={(title) => actions.addTask(title, area.id)} />
     </section>
   );

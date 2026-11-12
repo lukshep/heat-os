@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
-import type { ID, Task } from '../data/model';
-import { tasksIn } from '../data/selectors';
+import type { ID } from '../data/model';
+import { inArea, type ListItem } from '../data/selectors';
 import { Inbox } from '../screens/Inbox';
 import { Projects } from '../screens/Projects';
 import { Today } from '../screens/Today';
@@ -58,7 +58,7 @@ function Shell({ saving }: Props) {
   const [tab, setTab] = useState<Tab>('today');
   const [undo, setUndo] = useState<{ completionId: ID; title: string } | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
-  const hasInbox = tasksIn(view.tasks, null).length > 0;
+  const hasInbox = inArea(view.items, null).length > 0;
 
   useEffect(() => {
     if (!undo) return;
@@ -66,8 +66,8 @@ function Shell({ saving }: Props) {
     return () => window.clearTimeout(timer);
   }, [undo]);
 
-  function complete(task: Task) {
-    setUndo({ completionId: actions.completeTask(task.id), title: task.title });
+  function complete(item: ListItem) {
+    setUndo({ completionId: actions.complete(item), title: item.title });
   }
 
   function capture() {

@@ -25,6 +25,8 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 **Inbox** is frictionless capture. An inbox item is a task with no area and no project; organising it means giving it a home.
 
+**Routines** are tasks that repeat. Giving a filed task one or more weekdays makes it a routine; clearing them makes it a one-off task again. A routine must live in an area. On Today it appears on its scheduled days until it is done. In its area it is always listed, shown as done for the rest of the day once completed, and can be completed on an unscheduled day too.
+
 Tasks can be completed from any section. A slim HEAT strip stays visible outside Today so every completion gives feedback.
 
 ## Data model
@@ -72,6 +74,8 @@ interface AppState {
 - "Done" is derived from the completion log. Tasks have no `completedAt`.
 - Completions record facts, not scores, and snapshot everything needed to score them. Editing or deleting an item later never changes past HEAT.
 - Routine warmth is derived by walking scheduled days after `warmthBase.asOf` against the days the routine was completed. Editing a schedule re-snapshots the base so history is not reinterpreted.
+- A routine keeps the id of the task it was made from, and a task made from a routine keeps the routine's id. The record it left behind is soft-deleted, so an id is live in at most one of the two collections.
+- A routine counts once per day. Its completion records the warmth it had at that moment and whether the day was scheduled.
 - `deferred` holds the tasks swapped out of Today's suggestions. It only counts on the day it was made and is not meant to sync.
 - Sync readiness consists of stable IDs, `updatedAt`, soft-delete tombstones, an append-only log, and a fold that ignores duplicates (one completion per task; one per routine per day).
 

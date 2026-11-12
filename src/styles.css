@@ -257,6 +257,21 @@ button {
   background: var(--temp);
 }
 
+/* A routine that is done for the day stays in its area, quiet, until tomorrow. */
+
+.row.is-done .row-check-ring {
+  display: grid;
+  place-items: center;
+  border-color: var(--faint);
+  background: var(--faint);
+  box-shadow: none;
+  color: var(--bg);
+}
+
+.row.is-done .row-title-text {
+  color: var(--muted);
+}
+
 .row-title {
   flex: 1;
   min-width: 0;
@@ -321,6 +336,12 @@ button {
   margin-bottom: 8px;
   color: var(--faint);
   font-size: 13px;
+}
+
+.editor-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
 }
 
 .chips {

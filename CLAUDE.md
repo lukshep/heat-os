@@ -66,7 +66,9 @@ Import rules:
 - **HEAT is derived, never stored.** The completion log is the single source of truth; `foldHeat` replays it. Undo removes a completion; nothing else needs repair.
 - **Every tunable number lives in `HeatConfig`** (`src/heat/config.ts`). No magic numbers in the engine or UI.
 - **Completions are immutable facts** (when, which item, area, flags, warmth, day), never scores. Editing or deleting an item later must not rewrite past HEAT.
-- **"Done" is derived** from the completion log. Tasks have no `completedAt`.
+- **"Done" is derived** from the completion log. Tasks have no `completedAt`; a routine is done today if the log holds a completion for today.
+- **Routine warmth is derived**, never stored as a running value. Only `warmthBase` is saved, and it is re-snapshotted when a schedule changes.
+- **Screens list `ListItem`s** (`src/data/selectors.ts`), one shape for tasks and routines. A task and the routine made from it share an id.
 - **All records carry** `id`, `createdAt`, `updatedAt`, `deletedAt`. Delete by setting `deletedAt`.
 - **Changing the persisted shape** means bumping `schemaVersion` and adding a migration.
 - **Engine changes need a test.** Unit tests use the round numbers in `src/heat/testConfig.ts`, never `DEFAULT_CONFIG`, so they do not move when the defaults are retuned.
