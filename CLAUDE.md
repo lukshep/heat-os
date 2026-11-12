@@ -1,0 +1,84 @@
+# HEAT
+
+A mobile-first PWA that turns personal productivity into momentum management. One value, HEAT (0–100), cools continuously and rises when tasks and routines are completed. The aim is to bring HEAT up to a threshold line at some point each day, not to stay above it and not to finish a list.
+
+- `docs/SPEC.md` — product rules, data model, the HEAT model, known balancing risks.
+- `docs/PLAN.md` — milestones, their status, open decisions, tuning log.
+
+Update those two files when a decision changes. They are the record; this file is the rulebook.
+
+## Product guardrails
+
+These are requirements. Do not add features that break them, even as small helpers.
+
+- HEAT is the only progress bar. No percentages, XP, currencies, achievements, badges or dashboards.
+- Never display streak counts, routine warmth or routine progress. Warmth is felt only through colour.
+- No daily completion state: no "all done", no record or badge for reaching the line, no midnight reset of HEAT. The bar and its threshold mark are the only signals.
+- No "areas touched today" indicator, or anything else that turns the day into a checklist.
+- Temperature colour is the main feedback. Numbers stay out of the product UI; the dev screen may show them.
+- Capture and completion take as few taps as possible. Tasks can be completed from every screen.
+- Keep scope small. No speculative features, settings or abstractions.
+
+## Commands
+
+```bash
+npm run dev         # dev server; simulator at /#/dev
+npm test            # engine unit tests + scenario invariants (run once)
+npm run test:watch  # tests in watch mode
+npm run typecheck   # tsc --noEmit
+npm run build       # typecheck + production build, including the service worker
+npm run preview     # serve the production build; the only way to test offline launch
+```
+
+## Deploy
+
+Every push to `master` runs `.github/workflows/deploy.yml`: tests, production build, publish to GitHub Pages at https://lukshep.github.io/heat-os/. The installed app updates itself the next time it is opened online.
+
+- The repository is public. Never commit personal data, exported backups or secrets.
+- The build reads its base path from `BASE_PATH`; the workflow sets it to the repository name. Locally it is `/`.
+- The address is permanent. Saved data is tied to it, so moving hosts means exporting a backup and importing it at the new address.
+
+## Architecture
+
+```
+src/
+  heat/      pure engine
+  data/      model, reducer, selectors, storage
+  app/       React glue: shell, store, clock, view, backup
+  ui/        presentational components, temperature colour
+  screens/   Today, Projects, Inbox
+  dev/       DEV-only simulator and tuning screen
+public/      icons and favicon
+scripts/     make-icons.mjs, which draws the icon PNGs
+```
+
+Import rules:
+
+- `heat/` imports nothing outside `heat/`. No React, DOM, storage, `Date.now()` or argument-less `new Date()`. Time, day and config are always arguments.
+- `data/` may import `heat/`. No React. The reducer is pure: actions carry their own ids, times and day keys.
+- `ui/` may import `heat/` and `data/` types, but not `app/`. Components take callbacks, they do not dispatch.
+- `app/` and `screens/` may import everything except `dev/`.
+- `dev/` is reached only through a dynamic import behind `import.meta.env.DEV`, so it never ships.
+- The clock is `app/clock.ts`. Screens read time from it and pass it in; nothing else calls `Date.now()`.
+
+## Invariants
+
+- **HEAT is derived, never stored.** The completion log is the single source of truth; `foldHeat` replays it. Undo removes a completion; nothing else needs repair.
+- **Every tunable number lives in `HeatConfig`** (`src/heat/config.ts`). No magic numbers in the engine or UI.
+- **Completions are immutable facts** (when, which item, area, flags, warmth, day), never scores. Editing or deleting an item later must not rewrite past HEAT.
+- **"Done" is derived** from the completion log. Tasks have no `completedAt`.
+- **All records carry** `id`, `createdAt`, `updatedAt`, `deletedAt`. Delete by setting `deletedAt`.
+- **Changing the persisted shape** means bumping `schemaVersion` and adding a migration.
+- **Engine changes need a test.** Unit tests use the round numbers in `src/heat/testConfig.ts`, never `DEFAULT_CONFIG`, so they do not move when the defaults are retuned.
+- **Retuning has a paper trail.** A change to `DEFAULT_CONFIG` must keep `scenarios.test.ts` passing, or change an invariant there on purpose. Either way, update the expected-behaviour table in `docs/SPEC.md` and add a line to the tuning log in `docs/PLAN.md`.
+
+## Conventions
+
+- **Dependencies:** ask before adding any. Runtime: `react`, `react-dom`. Dev: `vite`, `@vitejs/plugin-react`, `typescript`, `vitest`, `vite-plugin-pwa`. No router, state library, CSS framework, chart library or animation library.
+- **TypeScript:** strict, with `noUncheckedIndexedAccess`.
+- **CSS:** plain CSS with custom properties. Colours come from tokens in `src/styles.css`. The app is dark only.
+- **Temperature colour** comes from `src/ui/temperature.ts` and is applied to marks (the ring, the bar), never to text.
+- **Saved data:** anything loaded from storage or a backup file goes through `parseState` before the app trusts it. Data the build cannot read is never overwritten.
+- **Mobile-first:** design at 390px wide, respect safe-area insets, 44px minimum touch targets.
+- **Motion:** short and restrained; honour `prefers-reduced-motion`.
+- **Git:** commit only when asked.

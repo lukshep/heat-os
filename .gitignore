@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+.claude/settings.local.json
+.DS_Store
+
+# Exported backups hold personal data and must never be committed.
+heat-backup-*.json

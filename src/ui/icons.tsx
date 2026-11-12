@@ -1,0 +1,31 @@
+const base = {
+  width: 22,
+  height: 22,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+} as const;
+
+export function PlusIcon() {
+  return (
+    <svg {...base}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+/** Two arrows chasing each other: swap this suggestion for another. */
+export function SwapIcon() {
+  return (
+    <svg {...base}>
+      <path d="M4 9a8 8 0 0 1 14-3l2 2" />
+      <path d="M20 4v4h-4" />
+      <path d="M20 15a8 8 0 0 1-14 3l-2-2" />
+      <path d="M4 20v-4h4" />
+    </svg>
+  );
+}

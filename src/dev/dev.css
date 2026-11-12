@@ -1,0 +1,427 @@
+/* Simulator styles. Loaded only with the dev panel, so none of this reaches a production build. */
+
+.dev {
+  /*
+   * Chart roles, for the dark surface the whole app uses. The series colour is the one hue
+   * on the chart; the comparison line is neutral.
+   */
+  --viz-surface: #1a1a19;
+  --viz-ink: #f0efec;
+  --viz-ink-2: #c3c2b7;
+  --viz-muted: #898781;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-series: #d95926;
+  --viz-compare: #898781;
+
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px 48px;
+  display: grid;
+  gap: 16px;
+  font-size: 16px;
+}
+
+.dev h1,
+.dev h2,
+.dev p {
+  margin: 0;
+}
+
+.dev h1 {
+  font-size: 1.25rem;
+}
+
+.dev h2 {
+  font-size: 1rem;
+}
+
+.dev-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dev-header p,
+.dev-note,
+.dev-caption {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.dev-card {
+  background: var(--viz-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.dev-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dev-button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.dev-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Scenario controls: one row above everything they scope. */
+
+.dev-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dev-field {
+  display: grid;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.dev-field.is-wide {
+  grid-column: span 2;
+}
+
+.dev-field input,
+.dev-field select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+/* Layout: results beside config on wide screens, stacked on a phone. */
+
+.dev-columns {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .dev-columns {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+.dev-results {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Summary tiles */
+
+.dev-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  background: var(--viz-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.stat-label {
+  color: var(--viz-ink-2);
+  font-size: 0.8125rem;
+}
+
+.stat-value {
+  color: var(--viz-ink);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.stat-was {
+  color: var(--viz-muted);
+  font-size: 0.75rem;
+}
+
+/* Chart */
+
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--viz-ink-2);
+  font-size: 0.8125rem;
+}
+
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-key {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--viz-series);
+}
+
+.chart-key.is-compare {
+  background: var(--viz-compare);
+}
+
+.chart-key.is-threshold {
+  height: 0;
+  border-top: 1px dashed var(--viz-ink-2);
+  border-radius: 0;
+  background: none;
+}
+
+.chart {
+  position: relative;
+  border-radius: 8px;
+  touch-action: pan-y;
+}
+
+.chart:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.chart svg {
+  display: block;
+}
+
+.chart-grid {
+  stroke: var(--viz-grid);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  stroke: var(--viz-axis);
+  stroke-width: 1;
+}
+
+.chart-tick {
+  fill: var(--viz-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-threshold {
+  stroke: var(--viz-ink-2);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.chart-tick.is-threshold {
+  fill: var(--viz-ink);
+  font-weight: 600;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--viz-series);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-line.is-compare {
+  stroke: var(--viz-compare);
+}
+
+.chart-dot {
+  fill: var(--viz-series);
+  stroke: var(--viz-surface);
+  stroke-width: 2;
+}
+
+.chart-dot.is-compare {
+  fill: var(--viz-compare);
+}
+
+.chart-end-label {
+  fill: var(--viz-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chart-crosshair {
+  stroke: var(--viz-axis);
+  stroke-width: 1;
+}
+
+.chart-tip {
+  position: absolute;
+  transform: translateX(12px);
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--viz-surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.14);
+  color: var(--viz-ink-2);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.chart-tip.is-left {
+  transform: translateX(calc(-100% - 12px));
+}
+
+.chart-tip-moment {
+  margin-bottom: 4px;
+  color: var(--viz-muted);
+  font-size: 0.75rem;
+}
+
+.chart-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-tip-row strong {
+  color: var(--viz-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Table view and JSON */
+
+.dev-details {
+  margin-top: 12px;
+  font-size: 0.875rem;
+}
+
+.dev-details summary {
+  padding: 6px 0;
+  color: var(--viz-ink-2);
+  cursor: pointer;
+}
+
+.dev-table-scroll {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.dev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.dev-table th,
+.dev-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--viz-grid);
+  text-align: right;
+}
+
+.dev-table th {
+  position: sticky;
+  top: 0;
+  background: var(--viz-surface);
+  color: var(--viz-ink-2);
+  font-weight: 600;
+}
+
+.dev-json {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  overflow-x: auto;
+}
+
+/* Config sliders */
+
+.dev-config {
+  display: grid;
+  gap: 14px;
+}
+
+.dev-config-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dev-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dev-slider {
+  display: grid;
+  gap: 2px;
+  font-size: 0.8125rem;
+  color: var(--viz-ink-2);
+}
+
+.dev-slider-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dev-slider-value {
+  color: var(--viz-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.dev-slider.is-changed .dev-slider-value {
+  font-weight: 600;
+}
+
+.dev-slider input {
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  accent-color: var(--viz-series);
+}
+
+.dev-slider-was {
+  color: var(--viz-muted);
+  font-size: 0.75rem;
+}
