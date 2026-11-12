@@ -45,11 +45,6 @@ export function heatColor(temperature: number): string {
   return 'oklch(0.89 0.14 90)';
 }
 
-/** The whole gradient left to right, for the HEAT bar: position along the bar is HEAT. */
-export const HEAT_GRADIENT = `linear-gradient(90deg, ${Array.from({ length: 11 }, (_, step) => {
-  return `${heatColor(step / 10)} ${step * 10}%`;
-}).join(', ')})`;
-
 /** The hottest ordinary thing: a first task in a fresh area, marked Important, done from cold. */
 const REFERENCE_ITEM: Scorable = { areaId: 'reference', important: true, avoided: false, warmth: 0 };
 const START_OF_DAY: DayPosition = { inArea: 0, areasOpened: 0, flagged: 0 };

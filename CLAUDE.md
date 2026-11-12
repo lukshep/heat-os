@@ -11,9 +11,9 @@ Update those two files when a decision changes. They are the record; this file i
 
 These are requirements. Do not add features that break them, even as small helpers.
 
-- HEAT is the only progress bar. No percentages, XP, currencies, achievements, badges or dashboards.
+- HEAT is the only progress meter. It is the line of light round the edge of the screen (`src/ui/EdgeMeter.tsx`), present on every screen. No percentages, XP, currencies, achievements, badges or dashboards.
 - Never display streak counts, routine warmth or routine progress. Warmth is felt only through colour.
-- No daily completion state: no "all done", no record or badge for reaching the line, no midnight reset of HEAT. The bar and its threshold mark are the only signals.
+- No daily completion state: no "all done", no record or badge for reaching the line, no midnight reset of HEAT. The edge meter and its threshold mark are the only signals.
 - No "areas touched today" indicator, or anything else that turns the day into a checklist.
 - Temperature colour is the main feedback. Numbers stay out of the product UI; the dev screen may show them.
 - Capture and completion take as few taps as possible. Tasks can be completed from every screen.
@@ -82,7 +82,7 @@ Import rules:
 - **Dependencies:** ask before adding any. Runtime: `react`, `react-dom`. Dev: `vite`, `@vitejs/plugin-react`, `typescript`, `vitest`, `vite-plugin-pwa`. No router, state library, CSS framework, chart library or animation library.
 - **TypeScript:** strict, with `noUncheckedIndexedAccess`.
 - **CSS:** plain CSS with custom properties. Colours come from tokens in `src/styles.css`. The app is dark only.
-- **Temperature colour** comes from `src/ui/temperature.ts` and is applied to marks (the ring, the bar), never to text.
+- **Temperature colour** comes from `src/ui/temperature.ts` and is applied to marks (a row's ring, the edge meter), never to text.
 - **Saved data:** anything loaded from storage or a backup file goes through `parseState` before the app trusts it. Data the build cannot read is never overwritten.
 - **Mobile-first:** design at 390px wide, respect safe-area insets, 44px minimum touch targets.
 - **Motion:** short and restrained. `prefers-reduced-motion` is handled by one global rule at the end of `src/styles.css`, so new animations need nothing extra unless they delay an action in JavaScript.

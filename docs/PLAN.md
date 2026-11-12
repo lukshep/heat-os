@@ -10,11 +10,12 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M1 | Engine | Done 2026-11-12 |
 | M2 | Dev simulator | Done 2026-11-12 |
 | | **Checkpoint 1: tune the numbers** | In progress: first retune applied |
-| M3 | Phone prototype | Built 2026-11-12; not yet deployed or tried on an iPhone |
+| M3 | Phone prototype | Deployed 2026-11-12; not yet tried on an iPhone |
 | | **Checkpoint 2: use it for a week** | |
-| M4 | Routines | Built 2026-11-12; not yet deployed or tried on an iPhone |
-| M5 | Nested projects | Built 2026-11-12; not yet deployed or tried on an iPhone |
-| M6 | Polish | Built 2026-11-12; not yet deployed or tried on an iPhone |
+| M4 | Routines | Deployed 2026-11-12; not yet tried on an iPhone |
+| M5 | Nested projects | Deployed 2026-11-12; not yet tried on an iPhone |
+| M6 | Polish | Deployed 2026-11-12; not yet tried on an iPhone |
+| M7 | Edge meter | Built 2026-11-12; not yet deployed or tried on an iPhone |
 
 The first prototype is M1–M3.
 
@@ -181,6 +182,29 @@ How it was built:
 
 Verified on a production build in a desktop browser at phone size: old version-1 data loading and being saved as version 2, both settings, and each animation firing when it should. Reduced motion was checked only by confirming the rule is in the built stylesheet; it has not been tried with the system setting switched on. Not verified on an iPhone.
 
+### M7 — Edge meter
+
+Added after the original plan. HEAT is now a line of light round the edge of the screen, replacing the big bar on Today and the strip on the other screens. The notes under M6 that mention the bar describe what was built then.
+
+How it was built:
+
+- **The line** starts at the top centre and grows clockwise. Halfway is the bottom centre and a full loop is 100. Its colour is its temperature, and a bright tip marks the leading end.
+- **The mark** for the line to reach is a dot on the edge. At the usual 60 it sits just past the bottom-left corner. It moves when the setting is changed, and still glows once when HEAT climbs to it.
+- **A faint track** shows the whole loop, so the distance still to go can be seen.
+- **It is on every screen** and takes no touches, so nothing underneath it is harder to tap.
+- **The header** is now only the screen's name. Today lost its large bar, which leaves more room for the list.
+- **In a browser window** the app is a column, and the line runs round that column with gentler corners.
+- **The geometry** is a pure function with tests (`src/ui/edgePath.ts`), so where the mark sits for any setting is not left to the browser.
+
+Known weaknesses, to judge on the phone:
+
+- One task moves the tip only a few points of screen, which is a weaker reward than the old bar gave. If that disappoints, the fallback is a thermometer down one side.
+- A web app cannot ask a phone how round its screen is. The corner radius is one middle value for recent iPhones and needs tuning by eye; it will sit slightly off on some models.
+- The line starts behind the camera cut-out and passes above the clock and battery.
+- Thumbs and cases cover the right and bottom edges.
+
+Verified on a production build in a desktop browser at phone size: the line growing with each completion, the flare on a gain, the mark moving with the setting and answering when reached. Not verified on an iPhone, which is where every weakness above shows.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications.
@@ -203,7 +227,8 @@ Cloud sync, routine pause, notifications.
 | 12 | Adding a task to an area or project is behind a plus button, not an always-visible field | Assumed at M5; revisit at checkpoint 2 |
 | 13 | Projects cannot be moved or reordered | Assumed at M5; add when it is missed |
 | 14 | The line can be set from 20 to 90, and the day start from midnight to 8 am | Assumed at M6 |
-| 15 | The mark on the bar glows once when HEAT reaches it, and nothing is kept of it | Assumed at M6; remove if it starts to feel like a daily pass or fail |
+| 15 | The mark glows once when HEAT reaches it, and nothing is kept of it | Assumed at M6; remove if it starts to feel like a daily pass or fail |
+| 16 | HEAT is shown as a line round the edge of the screen, not a bar | Decided 2026-11-12; a side thermometer is the fallback if it reads poorly |
 
 ## Tuning log
 

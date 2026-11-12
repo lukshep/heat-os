@@ -2,13 +2,13 @@
 
 ## Concept
 
-HEAT is a personal productivity app built around one mechanic: a value from 0 to 100 that cools continuously and rises when you complete tasks and routines. A threshold (initially 60) is marked on the bar. The aim is to bring HEAT up to that line at some point each day. Staying above it all day is not the goal. There are no streaks, deadlines, completion states or analytics.
+HEAT is a personal productivity app built around one mechanic: a value from 0 to 100 that cools continuously and rises when you complete tasks and routines. HEAT is shown as a line of light that runs clockwise round the edge of the screen from the top centre, so halfway is the bottom centre and a full loop is 100. A threshold (initially 60) is marked on that edge. The aim is to bring HEAT up to that mark at some point each day. Staying above it all day is not the goal. There are no streaks, deadlines, completion states or analytics.
 
 It is a mobile-first Progressive Web App used mainly on iPhone and also in a desktop browser. Data is stored locally; the structure allows cloud sync later.
 
 ## Principles
 
-- HEAT is visually dominant and is the only progress bar.
+- HEAT is visually dominant and is the only progress meter.
 - Temperature and colour are the primary feedback. Users should recognise the most rewarding action without reading numbers.
 - Balanced activity across life areas is rewarded more than volume in one area, but breadth alone is not enough: one task in each area does not reach the line.
 - Consistency pays: routines kept reliably are worth more, and lapse quickly when missed.
@@ -27,7 +27,7 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 **Routines** are tasks that repeat. Giving a filed task one or more weekdays makes it a routine; clearing them makes it a one-off task again. A routine must live in an area. On Today it appears on its scheduled days until it is done. In its area it is always listed, shown as done for the rest of the day once completed, and can be completed on an unscheduled day too.
 
-Tasks can be completed from any section. A slim HEAT strip stays visible outside Today so every completion gives feedback.
+Tasks can be completed from any section. HEAT is shown on every screen, so every completion gives feedback wherever it happens.
 
 ## Data model
 
@@ -178,7 +178,7 @@ An item's colour maps the HEAT it would add if completed now onto a continuous t
 | Slow recovery | From zero it takes a week of maintenance days to reach the line | Big days get there in four. The same fix as small steps |
 | Warm routines carry a lot | Three fully warm routines alone reach 58 | Intended reward for consistency; the full-warmth bonus is the lever |
 | Very high HEAT is nearly out of reach | Coasting through a day off needs about 140 points a day beforehand | Accept; revisit if it never happens in real use |
-| A daily pass or fail | Aiming to touch the line each day can feel like a streak | Never record or display whether the line was reached; the bar and the line are the only signals |
+| A daily pass or fail | Aiming to touch the line each day can feel like a streak | Never record or display whether the line was reached; the edge meter and its mark are the only signals |
 | Time off resets routines | Three missed days in a row leave a routine cold | Intended. A routine pause is a later feature |
 | Cadence asymmetry | A daily routine warms in a week, a weekly one in two months | Observe; the step could scale with cadence |
 | Retroactive retuning | Changing config rewrites current HEAT, because it is derived | Wanted in the simulator; config is fixed in production builds |

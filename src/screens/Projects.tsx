@@ -216,7 +216,7 @@ function Settings({ view }: { view: View }) {
     <footer className="settings">
       <h2 className="settings-title">Settings</h2>
 
-      {/* No number is shown: the line itself moves on the bar at the top of the screen. */}
+      {/* No number is shown: the mark itself moves along the edge of the screen. */}
       <label className="setting">
         <span className="setting-name">The line</span>
         <input
@@ -228,7 +228,7 @@ function Settings({ view }: { view: View }) {
           aria-valuetext={`${threshold} of ${MAX_HEAT}`}
           onChange={(event) => actions.updateSettings({ threshold: Number(event.target.value) })}
         />
-        <span className="setting-note">How much HEAT to aim for each day. Watch the mark move on the bar above.</span>
+        <span className="setting-note">How much HEAT to aim for each day. Watch the mark move along the edge of the screen.</span>
       </label>
 
       <label className="setting">

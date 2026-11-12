@@ -5,7 +5,7 @@ import { inArea, type ListItem } from '../data/selectors';
 import { Inbox } from '../screens/Inbox';
 import { Projects } from '../screens/Projects';
 import { Today } from '../screens/Today';
-import { HeatBar } from '../ui/HeatBar';
+import { EdgeMeter } from '../ui/EdgeMeter';
 import { PlusIcon } from '../ui/icons';
 import { useActions } from './store';
 import { useView } from './view';
@@ -78,11 +78,13 @@ function Shell({ saving }: Props) {
 
   return (
     <div className="app">
-      <header className={tab === 'today' ? 'head is-hero' : 'head'}>
+      {/* HEAT runs round the edge of every screen, so no screen needs a bar of its own. */}
+      <EdgeMeter heat={view.heat.heat} threshold={view.config.threshold} />
+
+      <header className="head">
         <h1 className={tab === 'today' ? 'head-word' : 'head-title'}>
           {tab === 'today' ? 'HEAT' : TABS.find((entry) => entry.id === tab)?.label}
         </h1>
-        <HeatBar heat={view.heat.heat} threshold={view.config.threshold} size={tab === 'today' ? 'hero' : 'slim'} />
       </header>
 
       <main className="main" key={tab}>
