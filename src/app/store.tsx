@@ -39,7 +39,8 @@ export function createStore(initial: AppState): AppStore {
  * that depends on the HEAT config, which keeps the reducer pure.
  */
 export interface Actions {
-  addTask(title: string, areaId: ID | null): void;
+  /** Adds a task to the Inbox (no area), the top of an area, or a project. */
+  addTask(title: string, areaId: ID | null, projectId?: ID | null): void;
   updateItem(item: ListItem, patch: ItemPatch): void;
   deleteItem(item: ListItem): void;
   /** Sets the weekdays an item repeats on. Any days make it a routine; none make it a one-off task. */
@@ -50,6 +51,11 @@ export interface Actions {
   addArea(name: string): void;
   renameArea(id: ID, name: string): void;
   deleteArea(id: ID): void;
+  /** Adds a project at the top of an area, or inside the project `parentId`. */
+  addProject(name: string, areaId: ID, parentId: ID | null): void;
+  renameProject(id: ID, name: string): void;
+  /** Removes a project; whatever was in it moves up one level. */
+  deleteProject(id: ID): void;
   /** Sets a task aside from Today's suggestions for the rest of the day. */
   deferToday(taskId: ID): void;
   replaceState(state: AppState): void;
@@ -60,7 +66,8 @@ export function createActions(store: AppStore, config: HeatConfig): Actions {
   const dayOf = (at: number) => localDayKey(at, config.dayStartHour);
 
   return {
-    addTask: (title, areaId) => store.dispatch({ type: 'task/add', id: newId(), at: clock.touch(), title, areaId }),
+    addTask: (title, areaId, projectId = null) =>
+      store.dispatch({ type: 'task/add', id: newId(), at: clock.touch(), title, areaId, projectId }),
 
     updateItem(item, patch) {
       const type = item.kind === 'task' ? 'task/update' : 'routine/update';
@@ -117,6 +124,10 @@ export function createActions(store: AppStore, config: HeatConfig): Actions {
     addArea: (name) => store.dispatch({ type: 'area/add', id: newId(), at: clock.touch(), name }),
     renameArea: (id, name) => store.dispatch({ type: 'area/rename', id, at: clock.touch(), name }),
     deleteArea: (id) => store.dispatch({ type: 'area/delete', id, at: clock.touch() }),
+    addProject: (name, areaId, parentId) =>
+      store.dispatch({ type: 'project/add', id: newId(), at: clock.touch(), name, areaId, parentId }),
+    renameProject: (id, name) => store.dispatch({ type: 'project/rename', id, at: clock.touch(), name }),
+    deleteProject: (id) => store.dispatch({ type: 'project/delete', id, at: clock.touch() }),
     deferToday: (taskId) => store.dispatch({ type: 'today/defer', dayKey: dayOf(clock.touch()), taskId }),
     replaceState: (state) => store.dispatch({ type: 'state/replace', state }),
   };

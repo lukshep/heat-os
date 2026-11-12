@@ -1,9 +1,13 @@
 import type { DayKey } from '../heat/day';
 import type { WarmthBase } from '../heat/warmth';
-import type { AppState, Area, Completion, ID, Routine, Task } from './model';
+import type { AppState, Area, Completion, ID, Project, Routine, Task } from './model';
 
-/** What can be edited on a task or a routine. A routine ignores a null area: it must have a home. */
-export type ItemPatch = Partial<Pick<Task, 'title' | 'areaId' | 'important' | 'avoided'>>;
+/**
+ * What can be edited on a task or a routine. To move it, give `projectId` (its area follows)
+ * or give `areaId` alone for the top of an area; a null `areaId` is the Inbox. A routine
+ * ignores a move to the Inbox: it must have a home.
+ */
+export type ItemPatch = Partial<Pick<Task, 'title' | 'areaId' | 'projectId' | 'important' | 'avoided'>>;
 
 /**
  * Everything that can change the state. Actions carry their own ids, times and day keys,
@@ -11,7 +15,7 @@ export type ItemPatch = Partial<Pick<Task, 'title' | 'areaId' | 'important' | 'a
  * action always produces the same state.
  */
 export type Action =
-  | { type: 'task/add'; id: ID; at: number; title: string; areaId: ID | null }
+  | { type: 'task/add'; id: ID; at: number; title: string; areaId: ID | null; projectId?: ID | null }
   | { type: 'task/update'; id: ID; at: number; patch: ItemPatch }
   | { type: 'task/delete'; id: ID; at: number }
   | { type: 'task/complete'; id: ID; at: number; dayKey: DayKey; taskId: ID }
@@ -37,6 +41,11 @@ export type Action =
   | { type: 'area/add'; id: ID; at: number; name: string }
   | { type: 'area/rename'; id: ID; at: number; name: string }
   | { type: 'area/delete'; id: ID; at: number }
+  /** Adds a project at the top of an area, or inside `parentId`, whose area it then takes. */
+  | { type: 'project/add'; id: ID; at: number; name: string; areaId: ID; parentId: ID | null }
+  | { type: 'project/rename'; id: ID; at: number; name: string }
+  /** Removes a project. Whatever was in it moves up one level. */
+  | { type: 'project/delete'; id: ID; at: number }
   | { type: 'today/defer'; dayKey: DayKey; taskId: ID }
   | { type: 'state/replace'; state: AppState };
 
@@ -57,6 +66,34 @@ function hasLiveCompletion(state: AppState, kind: Completion['kind'], itemId: ID
 /** Weekday numbers as a schedule stores them: whole, 0 to 6, unique and in order. */
 function cleanDays(days: readonly number[]): number[] {
   return [...new Set(days.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))].sort((a, b) => a - b);
+}
+
+interface Home {
+  areaId: ID | null;
+  projectId: ID | null;
+}
+
+/**
+ * Where a request wants something to live. A project decides its own area; an area alone
+ * means the top of that area; neither means the Inbox. Returns null for a place that does
+ * not exist, so a bad request leaves the item where it is.
+ */
+function resolveHome(state: AppState, areaId: ID | null, projectId: ID | null | undefined): Home | null {
+  if (projectId != null) {
+    const project = state.projects[projectId];
+    return isLive(project) && isLive(state.areas[project.areaId])
+      ? { areaId: project.areaId, projectId: project.id }
+      : null;
+  }
+  if (areaId === null) return { areaId: null, projectId: null };
+  return isLive(state.areas[areaId]) ? { areaId, projectId: null } : null;
+}
+
+/** The move a patch asks for, or null when it asks for none. */
+function requestedHome(state: AppState, patch: ItemPatch): Home | null {
+  if (patch.projectId != null) return resolveHome(state, null, patch.projectId);
+  if (patch.areaId === undefined) return null;
+  return resolveHome(state, patch.areaId, null);
 }
 
 /** Applies the shared fields of a patch. Returns the same record type it was given. */
@@ -92,15 +129,15 @@ export function reduce(state: AppState, action: Action): AppState {
     case 'task/add': {
       const title = action.title.trim();
       if (!title || state.tasks[action.id]) return state;
-      const areaId = action.areaId !== null && isLive(state.areas[action.areaId]) ? action.areaId : null;
+      // Somewhere that does not exist falls back to the Inbox, so a capture is never lost.
+      const home = resolveHome(state, action.areaId, action.projectId) ?? { areaId: null, projectId: null };
       const task: Task = {
         id: action.id,
         createdAt: action.at,
         updatedAt: action.at,
         deletedAt: null,
         title,
-        areaId,
-        projectId: null,
+        ...home,
         important: false,
         avoided: false,
       };
@@ -111,12 +148,8 @@ export function reduce(state: AppState, action: Action): AppState {
       const task = state.tasks[action.id];
       if (!isLive(task)) return state;
       const next = patched(task, action.patch, action.at);
-      const { areaId } = action.patch;
-      if (areaId !== undefined && areaId !== task.areaId && (areaId === null || isLive(state.areas[areaId]))) {
-        // Moving between areas leaves any project behind.
-        next.areaId = areaId;
-        next.projectId = null;
-      }
+      const home = requestedHome(state, action.patch);
+      if (home) Object.assign(next, home);
       return { ...state, tasks: { ...state.tasks, [task.id]: next } };
     }
 
@@ -180,10 +213,10 @@ export function reduce(state: AppState, action: Action): AppState {
       const routine = state.routines[action.id];
       if (!isLive(routine)) return state;
       const next = patched(routine, action.patch, action.at);
-      const { areaId } = action.patch;
-      if (areaId != null && areaId !== routine.areaId && isLive(state.areas[areaId])) {
-        next.areaId = areaId;
-        next.projectId = null;
+      const home = requestedHome(state, action.patch);
+      if (home && home.areaId !== null) {
+        next.areaId = home.areaId;
+        next.projectId = home.projectId;
       }
       return { ...state, routines: { ...state.routines, [routine.id]: next } };
     }
@@ -269,8 +302,8 @@ export function reduce(state: AppState, action: Action): AppState {
     case 'area/delete': {
       const area = state.areas[action.id];
       if (!isLive(area)) return state;
-      // Everything in it goes back to the Inbox. A routine cannot live there, so it becomes a
-      // one-off task. Completions keep the area they were earned in.
+      // Everything in it goes back to the Inbox, and its projects go with it. A routine cannot
+      // live in the Inbox, so it becomes a one-off task. Completions keep the area they were earned in.
       let next: AppState = state;
       for (const routine of Object.values(state.routines)) {
         if (routine.areaId === area.id && routine.deletedAt === null) {
@@ -283,11 +316,72 @@ export function reduce(state: AppState, action: Action): AppState {
           tasks[task.id] = { ...task, areaId: null, projectId: null, updatedAt: action.at };
         }
       }
+      const projects = { ...state.projects };
+      for (const project of Object.values(state.projects)) {
+        if (project.areaId === area.id && project.deletedAt === null) {
+          projects[project.id] = { ...project, updatedAt: action.at, deletedAt: action.at };
+        }
+      }
       return {
         ...next,
         tasks,
+        projects,
         areas: { ...state.areas, [area.id]: { ...area, updatedAt: action.at, deletedAt: action.at } },
       };
+    }
+
+    case 'project/add': {
+      const name = action.name.trim();
+      if (!name || state.projects[action.id]) return state;
+      const home = resolveHome(state, action.areaId, action.parentId);
+      if (!home || home.areaId === null) return state;
+      const siblings = Object.values(state.projects).filter(
+        (project) => project.areaId === home.areaId && project.parentId === home.projectId,
+      );
+      const project: Project = {
+        id: action.id,
+        createdAt: action.at,
+        updatedAt: action.at,
+        deletedAt: null,
+        name,
+        areaId: home.areaId,
+        parentId: home.projectId,
+        order: Math.max(-1, ...siblings.map((sibling) => sibling.order)) + 1,
+      };
+      return { ...state, projects: { ...state.projects, [project.id]: project } };
+    }
+
+    case 'project/rename': {
+      const project = state.projects[action.id];
+      const name = action.name.trim();
+      if (!isLive(project) || !name) return state;
+      return {
+        ...state,
+        projects: { ...state.projects, [project.id]: { ...project, name, updatedAt: action.at } },
+      };
+    }
+
+    case 'project/delete': {
+      const project = state.projects[action.id];
+      if (!isLive(project)) return state;
+      // Nothing inside is lost: tasks, routines and projects all move up to where this one sat.
+      const lift = <T extends Task | Routine>(records: Record<ID, T>): Record<ID, T> => {
+        const next = { ...records };
+        for (const record of Object.values(records)) {
+          if (record.projectId === project.id && record.deletedAt === null) {
+            next[record.id] = { ...record, projectId: project.parentId, updatedAt: action.at };
+          }
+        }
+        return next;
+      };
+      const projects = { ...state.projects };
+      for (const child of Object.values(state.projects)) {
+        if (child.parentId === project.id && child.deletedAt === null) {
+          projects[child.id] = { ...child, parentId: project.parentId, updatedAt: action.at };
+        }
+      }
+      projects[project.id] = { ...project, updatedAt: action.at, deletedAt: action.at };
+      return { ...state, projects, tasks: lift(state.tasks), routines: lift(state.routines) };
     }
 
     case 'today/defer': {

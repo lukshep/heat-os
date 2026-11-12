@@ -5,12 +5,16 @@ interface Props {
   placeholder: string;
   onAdd: (text: string) => void;
   inputRef?: Ref<HTMLInputElement>;
-  /** The main capture field stands out; the per-area fields stay quiet until used. */
+  /** The main capture field stands out; the others stay quiet until used. */
   prominent?: boolean;
+  /** Take the cursor as soon as it appears. For fields that open because they were asked for. */
+  autoFocus?: boolean;
+  /** Called when the field is left empty or dismissed, so a field that was opened can close again. */
+  onDone?: () => void;
 }
 
 /** A one-line field that adds on Return and stays focused, so several things can be entered in a row. */
-export function AddInput({ placeholder, onAdd, inputRef, prominent = false }: Props) {
+export function AddInput({ placeholder, onAdd, inputRef, prominent = false, autoFocus = false, onDone }: Props) {
   const [text, setText] = useState('');
 
   return (
@@ -27,11 +31,18 @@ export function AddInput({ placeholder, onAdd, inputRef, prominent = false }: Pr
         ref={inputRef}
         value={text}
         onChange={(event) => setText(event.target.value)}
+        onBlur={() => {
+          if (!text.trim()) onDone?.();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') onDone?.();
+        }}
         placeholder={placeholder}
         aria-label={placeholder}
         enterKeyHint="done"
         autoComplete="off"
         autoCapitalize="sentences"
+        autoFocus={autoFocus}
       />
     </form>
   );

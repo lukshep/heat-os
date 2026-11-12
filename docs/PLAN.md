@@ -13,7 +13,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M3 | Phone prototype | Built 2026-11-12; not yet deployed or tried on an iPhone |
 | | **Checkpoint 2: use it for a week** | |
 | M4 | Routines | Built 2026-11-12; not yet deployed or tried on an iPhone |
-| M5 | Nested projects | Not started |
+| M5 | Nested projects | Built 2026-11-12; not yet deployed or tried on an iPhone |
 | M6 | Polish | Not started |
 
 The first prototype is M1–M3.
@@ -145,6 +145,21 @@ Verified in a desktop browser at phone size: making and unmaking a routine, comp
 
 Project tree UI, organising and moving items out of the Inbox.
 
+How it was built:
+
+- **The Projects screen is one tree.** Every area is a section, and projects nest inside it to any depth, each indented one step further. A section's header has a chevron to fold it, its name, and a plus button.
+- **Folding** hides a section's items and everything nested in it. What is folded is remembered on the device, outside the saved data and its backups.
+- **The plus button** opens a field for adding a task straight into that area or project. It replaces the always-visible field each area had, which would not scale to a tree. The field closes when left empty.
+- **Tapping a name** opens rename, delete, and a field for starting a project inside it.
+- **Deleting a project** moves its tasks, routines and projects up one level. Deleting an area still sends everything to the Inbox, and now removes its projects.
+- **"Keep it in"** in an item's editor is now a picker listing the Inbox and every area and project by its full path. It replaces the row of area chips and is how an Inbox item is filed anywhere in the tree.
+- **Rows shown away from their place** (on Today) name the full path, such as "Work › Website › Launch".
+- **An item's area always follows its project.** The reducer enforces it, so scoring by area needs no change.
+
+Not included: moving a project to a different parent or area, and reordering. For now that means deleting and recreating it.
+
+Verified in a desktop browser at phone size: building a three-level tree, adding into each level, filing an Inbox item into a nested project, folding surviving a reload, completing a nested task, and deleting a project with its contents moving up. Not verified on an iPhone, where the native picker is the part most worth checking.
+
 ### M6 — Polish
 
 Animation pass, settings for threshold and day start, reduced-motion support.
@@ -168,6 +183,8 @@ Cloud sync, routine pause, notifications.
 | 9 | A routine missed two or three times in a row is cold | Decided 2026-11-12 |
 | 10 | The app is dark only | Assumed at M3; revisit at checkpoint 2 |
 | 11 | Completed tasks are not listed anywhere; the Undo toast is the only way back | Assumed at M3; revisit at checkpoint 2 |
+| 12 | Adding a task to an area or project is behind a plus button, not an always-visible field | Assumed at M5; revisit at checkpoint 2 |
+| 13 | Projects cannot be moved or reordered | Assumed at M5; add when it is missed |
 
 ## Tuning log
 

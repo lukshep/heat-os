@@ -41,7 +41,7 @@ export function Today({ view, onComplete }: Props) {
       items={[...routines, ...picks]}
       view={view}
       onComplete={onComplete}
-      showArea
+      showPlace
       trailing={(item) =>
         item.kind === 'task' && canSwap ? (
           <button

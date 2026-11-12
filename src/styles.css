@@ -46,7 +46,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
   color: inherit;
 }
@@ -315,8 +316,9 @@ button {
 }
 
 .editor input,
+.editor select,
 .add input,
-.area-edit input {
+.place-edit input {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
@@ -326,8 +328,9 @@ button {
 }
 
 .editor input:focus,
+.editor select:focus,
 .add input:focus,
-.area-edit input:focus {
+.place-edit input:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -405,15 +408,63 @@ button {
   color: var(--muted);
 }
 
-/* Areas on the Projects screen. */
+/*
+ * The Projects tree. Every area and project is a section that folds shut; a project is
+ * indented one step further than whatever it sits inside.
+ */
 
-.area {
-  margin-top: 18px;
+.place {
+  padding-left: calc(var(--depth) * 18px);
 }
 
-.area-name {
+.place.is-area {
+  margin-top: 10px;
+}
+
+.place-head {
+  display: flex;
+  align-items: center;
   min-height: 44px;
-  padding: 0 8px;
+}
+
+.place-fold,
+.place-add {
+  flex: none;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+}
+
+/* As wide as a row's ring, so names line up with the titles beneath them. */
+.place-fold {
+  width: 48px;
+}
+
+.place-add {
+  width: 44px;
+}
+
+.place-fold svg {
+  transition: transform 150ms ease;
+}
+
+.place-fold[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+
+.place-name {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place.is-area .place-name {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
@@ -421,15 +472,33 @@ button {
   text-transform: uppercase;
 }
 
-.area-edit {
+.place.is-project .place-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.place-edit {
+  padding: 0 0 8px 48px;
+}
+
+.place-edit-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.area-edit input {
+.place-edit-row input {
   flex: 1;
   min-width: 0;
+}
+
+/* The field that opens from a section's plus button lines up with the titles above it. */
+.place > .add {
+  margin-left: 48px;
+}
+
+.place-new {
+  margin-top: 24px;
 }
 
 .backup {
@@ -539,7 +608,8 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .heat-bar-fill,
   .row,
-  .row-check-ring {
+  .row-check-ring,
+  .place-fold svg {
     transition: none;
   }
 

@@ -69,6 +69,8 @@ Import rules:
 - **"Done" is derived** from the completion log. Tasks have no `completedAt`; a routine is done today if the log holds a completion for today.
 - **Routine warmth is derived**, never stored as a running value. Only `warmthBase` is saved, and it is re-snapshotted when a schedule changes.
 - **Screens list `ListItem`s** (`src/data/selectors.ts`), one shape for tasks and routines. A task and the routine made from it share an id.
+- **Areas and projects are `Place`s**, flattened in reading order by `places()`. An item's area always matches its project's area; the reducer enforces it, and scoring only looks at the area.
+- **View preferences are not data.** Which sections are folded lives in localStorage (`src/app/collapsed.ts`), outside the state document and its backups.
 - **All records carry** `id`, `createdAt`, `updatedAt`, `deletedAt`. Delete by setting `deletedAt`.
 - **Changing the persisted shape** means bumping `schemaVersion` and adding a migration.
 - **Engine changes need a test.** Unit tests use the round numbers in `src/heat/testConfig.ts`, never `DEFAULT_CONFIG`, so they do not move when the defaults are retuned.

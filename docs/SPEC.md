@@ -21,7 +21,7 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 **Today** shows HEAT prominently, then suggested tasks and routines. Suggestions are every routine scheduled today plus a few tasks chosen by how much HEAT they would add. Each pick assumes the earlier ones are done, which spreads suggestions across areas. A suggestion can be swapped for the next candidate. There is no completed state for the day; when suggestions run out the list is empty.
 
-**Projects** shows areas, each holding tasks, routines and arbitrarily nested projects. Projects are organisational only and have no progress.
+**Projects** shows areas, each holding tasks, routines and arbitrarily nested projects, as one tree whose sections fold shut. Projects are organisational only and have no progress. Any item can be moved to the Inbox, to the top of an area, or into any project, and an item in a project always belongs to that project's area.
 
 **Inbox** is frictionless capture. An inbox item is a task with no area and no project; organising it means giving it a home.
 
@@ -71,6 +71,8 @@ interface AppState {
 ```
 
 - Nesting is `Project.parentId`. Tasks and routines can sit directly in an area or in any project.
+- A project's `areaId` is the area its outermost ancestor sits in, and an item's `areaId` always matches its project's. Scoring only ever looks at the area.
+- Deleting a project moves what it held up one level. Nothing is deleted with it.
 - "Done" is derived from the completion log. Tasks have no `completedAt`.
 - Completions record facts, not scores, and snapshot everything needed to score them. Editing or deleting an item later never changes past HEAT.
 - Routine warmth is derived by walking scheduled days after `warmthBase.asOf` against the days the routine was completed. Editing a schedule re-snapshots the base so history is not reinterpreted.

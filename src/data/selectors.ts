@@ -38,6 +38,92 @@ export function inArea<T extends { areaId: ID | null }>(items: readonly T[], are
   return items.filter((item) => item.areaId === areaId);
 }
 
+/** Somewhere an item can live: an area, or a project at any depth inside one. */
+export interface Place {
+  /** Unique among places: 'area:<id>' or 'project:<id>'. */
+  key: string;
+  /** The area's own id, or the project's. */
+  id: ID;
+  areaId: ID;
+  /** Null for the top of an area. */
+  projectId: ID | null;
+  name: string;
+  /** 0 for an area, 1 for a project directly in it, and so on. */
+  depth: number;
+  /** Ids of the places it sits inside, outermost first. */
+  ancestors: ID[];
+  /** Its full path, for naming it out of context: "Work › Website". */
+  label: string;
+}
+
+const PATH_SEPARATOR = ' › ';
+
+/**
+ * Every area and project as one flat list in reading order: each area, then its projects,
+ * each followed by its own. A project whose parent is missing is shown at the top of its
+ * area rather than lost.
+ */
+export function places(state: AppState): Place[] {
+  const projects = Object.values(state.projects)
+    .filter((project) => project.deletedAt === null)
+    .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+  const live = new Set(projects.map((project) => project.id));
+  const result: Place[] = [];
+  const seen = new Set<ID>();
+
+  function addChildren(parent: Place) {
+    for (const project of projects) {
+      if (project.areaId !== parent.areaId || seen.has(project.id)) continue;
+      const parentId = project.parentId !== null && live.has(project.parentId) ? project.parentId : null;
+      if (parentId !== parent.projectId) continue;
+      seen.add(project.id);
+      const place: Place = {
+        key: `project:${project.id}`,
+        id: project.id,
+        areaId: parent.areaId,
+        projectId: project.id,
+        name: project.name,
+        depth: parent.depth + 1,
+        ancestors: [...parent.ancestors, parent.id],
+        label: parent.label + PATH_SEPARATOR + project.name,
+      };
+      result.push(place);
+      addChildren(place);
+    }
+  }
+
+  for (const area of liveAreas(state)) {
+    const place: Place = {
+      key: `area:${area.id}`,
+      id: area.id,
+      areaId: area.id,
+      projectId: null,
+      name: area.name,
+      depth: 0,
+      ancestors: [],
+      label: area.name,
+    };
+    result.push(place);
+    addChildren(place);
+  }
+  return result;
+}
+
+/** The items that sit directly in a place, not in the projects inside it. */
+export function itemsAt<T extends { areaId: ID | null; projectId: ID | null }>(
+  items: readonly T[],
+  place: Pick<Place, 'areaId' | 'projectId'>,
+): T[] {
+  return items.filter((item) => item.areaId === place.areaId && item.projectId === place.projectId);
+}
+
+/** The name of where an item lives, for rows shown away from their place. */
+export function placeLabel(all: readonly Place[], item: { areaId: ID | null; projectId: ID | null }): string {
+  if (item.areaId === null) return 'Inbox';
+  const found = all.find((place) => place.areaId === item.areaId && place.projectId === item.projectId);
+  return found?.label ?? 'Inbox';
+}
+
 /** Tasks set aside from Today's suggestions. The list only counts on the day it was made. */
 export function deferredToday(state: AppState, today: DayKey): ReadonlySet<ID> {
   return new Set(state.deferred.dayKey === today ? state.deferred.taskIds : []);
@@ -74,6 +160,8 @@ export interface ListItem {
   kind: 'task' | 'routine';
   title: string;
   areaId: ID | null;
+  /** The project it sits in, or null for the top of its area. Never a project that no longer exists. */
+  projectId: ID | null;
   important: boolean;
   avoided: boolean;
   createdAt: number;
@@ -90,6 +178,11 @@ export interface ListItem {
 /** Every routine, then every open task, each oldest first. */
 export function listItems(state: AppState, today: DayKey, config: HeatConfig): ListItem[] {
   const completed = routineDays(state);
+  // An item pointing at a project that is gone is treated as sitting at the top of its area.
+  const projectOf = (record: Task | Routine): ID | null => {
+    const project = record.projectId === null ? undefined : state.projects[record.projectId];
+    return project && project.deletedAt === null && project.areaId === record.areaId ? project.id : null;
+  };
 
   const routines = liveRoutines(state).map((routine): ListItem => {
     const days = completed.get(routine.id);
@@ -98,6 +191,7 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
       kind: 'routine',
       title: routine.title,
       areaId: routine.areaId,
+      projectId: projectOf(routine),
       important: routine.important,
       avoided: routine.avoided,
       createdAt: routine.createdAt,
@@ -113,6 +207,7 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
     kind: 'task',
     title: task.title,
     areaId: task.areaId,
+    projectId: projectOf(task),
     important: task.important,
     avoided: task.avoided,
     createdAt: task.createdAt,

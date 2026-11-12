@@ -1,7 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import type { Area } from '../data/model';
 import type { ItemPatch } from '../data/reducer';
-import type { ListItem } from '../data/selectors';
+import type { ListItem, Place } from '../data/selectors';
 import { CheckIcon } from './icons';
 import { heatColor } from './temperature';
 import { describeDays, weekdayName, weekdayOrder } from './weekdays';
@@ -10,7 +9,8 @@ interface Props {
   item: ListItem;
   /** 0 (cold) to 1 (hottest): how much HEAT completing it would add right now. */
   temperature: number;
-  areas: readonly Area[];
+  /** Every area and project, for choosing where the item lives. */
+  places: readonly Place[];
   open: boolean;
   /** The row stays in its list once completed, so it must not fold away. True for a routine outside Today. */
   stays: boolean;
@@ -80,7 +80,15 @@ export function ItemRow(props: Props) {
   );
 }
 
-function Editor({ item, areas, onUpdate, onSetDays, onDelete }: Props) {
+const INBOX = 'inbox';
+
+/** The value of the "Keep it in" picker that stands for where the item is now. */
+function homeKey(item: ListItem): string {
+  if (item.areaId === null) return INBOX;
+  return item.projectId === null ? `area:${item.areaId}` : `project:${item.projectId}`;
+}
+
+function Editor({ item, places, onUpdate, onSetDays, onDelete }: Props) {
   const [title, setTitle] = useState(item.title);
 
   function commitTitle() {
@@ -121,22 +129,25 @@ function Editor({ item, areas, onUpdate, onSetDays, onDelete }: Props) {
         </Chip>
       </div>
 
-      <div>
+      <label>
         <div className="editor-label">Keep it in</div>
-        <div className="chips" role="group" aria-label="Keep it in">
+        {/* A native picker: it copes with any number of areas and projects, at any depth. */}
+        <select
+          value={homeKey(item)}
+          onChange={(event) => {
+            const place = places.find((candidate) => candidate.key === event.target.value);
+            onUpdate(place ? { areaId: place.areaId, projectId: place.projectId } : { areaId: null, projectId: null });
+          }}
+        >
           {/* A routine needs a home, so only a one-off task can go back to the Inbox. */}
-          {item.kind === 'task' && (
-            <Chip pressed={item.areaId === null} onClick={() => onUpdate({ areaId: null })}>
-              Inbox
-            </Chip>
-          )}
-          {areas.map((area) => (
-            <Chip key={area.id} pressed={item.areaId === area.id} onClick={() => onUpdate({ areaId: area.id })}>
-              {area.name}
-            </Chip>
+          {item.kind === 'task' && <option value={INBOX}>Inbox</option>}
+          {places.map((place) => (
+            <option key={place.key} value={place.key}>
+              {place.label}
+            </option>
           ))}
-        </div>
-      </div>
+        </select>
+      </label>
 
       <div>
         <div className="editor-label">Repeat on</div>

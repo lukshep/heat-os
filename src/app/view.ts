@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { AppState, Area } from '../data/model';
-import { listItems, liveAreas, liveCompletions, type ListItem } from '../data/selectors';
+import type { AppState } from '../data/model';
+import { listItems, liveCompletions, places, type ListItem, type Place } from '../data/selectors';
 import { DEFAULT_CONFIG, type HeatConfig } from '../heat/config';
 import type { DayKey } from '../heat/day';
 import { foldHeat, type HeatState } from '../heat/engine';
@@ -16,7 +16,8 @@ export interface View {
   heat: HeatState;
   /** Every routine, then every task still to do, each oldest first. */
   items: ListItem[];
-  areas: Area[];
+  /** Every area and project, flattened in reading order. */
+  places: Place[];
 }
 
 export function useView(): View {
@@ -27,7 +28,7 @@ export function useView(): View {
 
   const heat = useMemo(() => foldHeat(liveCompletions(state), config, now, today), [state, config, now, today]);
   const items = useMemo(() => listItems(state, today, config), [state, today, config]);
-  const areas = useMemo(() => liveAreas(state), [state]);
+  const allPlaces = useMemo(() => places(state), [state]);
 
-  return { state, config, today, heat, items, areas };
+  return { state, config, today, heat, items, places: allPlaces };
 }

@@ -18,6 +18,15 @@ export function PlusIcon() {
   );
 }
 
+/** Points right when its section is folded; CSS turns it down when the section is open. */
+export function ChevronIcon() {
+  return (
+    <svg {...base} width={16} height={16} strokeWidth={2.5}>
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
 /** Sits inside the ring of a routine that is done for the day. */
 export function CheckIcon() {
   return (
