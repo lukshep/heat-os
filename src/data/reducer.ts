@@ -1,6 +1,16 @@
 import type { DayKey } from '../heat/day';
 import type { WarmthBase } from '../heat/warmth';
-import type { AppState, Area, Completion, ID, Project, Routine, Task } from './model';
+import {
+  normalizeSettings,
+  type AppState,
+  type Area,
+  type Completion,
+  type ID,
+  type Project,
+  type Routine,
+  type Settings,
+  type Task,
+} from './model';
 
 /**
  * What can be edited on a task or a routine. To move it, give `projectId` (its area follows)
@@ -47,6 +57,8 @@ export type Action =
   /** Removes a project. Whatever was in it moves up one level. */
   | { type: 'project/delete'; id: ID; at: number }
   | { type: 'today/defer'; dayKey: DayKey; taskId: ID }
+  /** Changes where the line sits or when the day starts. Values are kept on a step and inside their limits. */
+  | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'state/replace'; state: AppState };
 
 function isLive<T extends { deletedAt: number | null }>(record: T | undefined): record is T {
@@ -389,6 +401,13 @@ export function reduce(state: AppState, action: Action): AppState {
       const taskIds = sameDay ? state.deferred.taskIds : [];
       if (taskIds.includes(action.taskId)) return state;
       return { ...state, deferred: { dayKey: action.dayKey, taskIds: [...taskIds, action.taskId] } };
+    }
+
+    case 'settings/update': {
+      const settings = normalizeSettings({ ...state.settings, ...action.patch });
+      const unchanged =
+        settings.threshold === state.settings.threshold && settings.dayStartHour === state.settings.dayStartHour;
+      return unchanged ? state : { ...state, settings };
     }
 
     case 'state/replace':

@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION, type AppState } from './model';
+import { DEFAULT_SETTINGS, normalizeSettings, SCHEMA_VERSION, type AppState } from './model';
 
 /** Where the state document is kept. Swappable so tests, and later sync, need no browser. */
 export interface StorageAdapter {
@@ -115,11 +115,20 @@ function isCollection(value: unknown, shape: Record<string, Check>): boolean {
   );
 }
 
-/** Brings a document saved by an older version up to the current shape. */
+/**
+ * Brings a document saved by an older version up to the current shape, one version at a
+ * time. Each new version adds a step here that turns version n into n + 1. A document from
+ * a version this build does not know, newer ones included, is refused.
+ */
 function migrate(raw: Dict): Dict | null {
-  // Version 1 is the first shape, so there is nothing to convert yet. Each later version
-  // adds a step here that turns version n into n + 1.
-  return raw.schemaVersion === SCHEMA_VERSION ? raw : null;
+  let document = raw;
+
+  // Version 2 added settings. Before it, the line and the day start were fixed.
+  if (document.schemaVersion === 1) {
+    document = { ...document, schemaVersion: 2, settings: DEFAULT_SETTINGS };
+  }
+
+  return document.schemaVersion === SCHEMA_VERSION ? document : null;
 }
 
 /**
@@ -139,7 +148,11 @@ export function parseState(raw: unknown): AppState | null {
   if (!isDict(deferred) || !isString(deferred.dayKey)) return null;
   if (!Array.isArray(deferred.taskIds) || !deferred.taskIds.every(isString)) return null;
 
-  return current as unknown as AppState;
+  const settings = current.settings;
+  if (!isDict(settings) || !isNumber(settings.threshold) || !isNumber(settings.dayStartHour)) return null;
+
+  // A hand-edited backup could ask for a line off the end of the bar; pull such values back in.
+  return { ...current, settings: normalizeSettings(settings) } as unknown as AppState;
 }
 
 /** The backup file's contents. */

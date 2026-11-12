@@ -5,7 +5,6 @@ import { startClock } from './app/clock';
 import { createActions, createStore, persist, StoreProvider } from './app/store';
 import { createInitialState, type AppState } from './data/model';
 import { createIndexedDbStorage, parseState, type StorageAdapter } from './data/storage';
-import { DEFAULT_CONFIG } from './heat/config';
 import './styles.css';
 
 interface Boot {
@@ -42,7 +41,7 @@ void boot().then(({ state, storage }) => {
 
   createRoot(root).render(
     <StrictMode>
-      <StoreProvider store={store} actions={createActions(store, DEFAULT_CONFIG)}>
+      <StoreProvider store={store} actions={createActions(store)}>
         <App saving={storage !== null} />
       </StoreProvider>
     </StrictMode>,

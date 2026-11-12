@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { AppState } from '../data/model';
-import { listItems, liveCompletions, places, type ListItem, type Place } from '../data/selectors';
-import { DEFAULT_CONFIG, type HeatConfig } from '../heat/config';
+import { heatConfig, listItems, liveCompletions, places, type ListItem, type Place } from '../data/selectors';
+import type { HeatConfig } from '../heat/config';
 import type { DayKey } from '../heat/day';
 import { foldHeat, type HeatState } from '../heat/engine';
 import { localDayKey, useNow } from './clock';
@@ -10,6 +10,7 @@ import { useAppState } from './store';
 /** Everything a screen needs, worked out once per change so every screen agrees. */
 export interface View {
   state: AppState;
+  /** The tuned defaults with this person's own line and day start. */
   config: HeatConfig;
   today: DayKey;
   /** HEAT right now, plus what is needed to price the next completion. */
@@ -21,8 +22,8 @@ export interface View {
 }
 
 export function useView(): View {
-  const config = DEFAULT_CONFIG;
   const state = useAppState();
+  const config = useMemo(() => heatConfig(state.settings), [state.settings]);
   const now = useNow();
   const today = localDayKey(now, config.dayStartHour);
 

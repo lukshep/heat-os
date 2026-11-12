@@ -14,13 +14,20 @@ const FLARE_STEP = 0.2;
 
 export function HeatBar({ heat, threshold, size }: Props) {
   const level = Math.max(0, Math.min(MAX_HEAT, heat));
-  const previous = useRef(level);
+  const previous = useRef({ level, threshold });
   const [flares, setFlares] = useState(0);
+  const [arrivals, setArrivals] = useState(0);
 
   useEffect(() => {
-    if (level - previous.current >= FLARE_STEP) setFlares((count) => count + 1);
-    previous.current = level;
-  }, [level]);
+    const before = previous.current;
+    previous.current = { level, threshold };
+    const rose = level - before.level >= FLARE_STEP;
+    if (rose) setFlares((count) => count + 1);
+    // The mark answers only when HEAT climbs to it, never because the mark was moved.
+    if (rose && before.threshold === threshold && before.level < threshold && level >= threshold) {
+      setArrivals((count) => count + 1);
+    }
+  }, [level, threshold]);
 
   const style = {
     '--heat-gradient': HEAT_GRADIENT,
@@ -40,13 +47,13 @@ export function HeatBar({ heat, threshold, size }: Props) {
       aria-valuenow={Math.round(level)}
       aria-valuetext={`${Math.round(level)} of ${MAX_HEAT}. The line is at ${threshold}.`}
     >
-      <div key={flares} className={flares > 0 ? 'heat-bar-glow is-flaring' : 'heat-bar-glow'}>
+      <div key={`glow-${flares}`} className={flares > 0 ? 'heat-bar-glow is-flaring' : 'heat-bar-glow'}>
         <div className="heat-bar-fill" />
       </div>
       <div className="heat-bar-track">
         <div className="heat-bar-fill" />
       </div>
-      <div className="heat-bar-line" />
+      <div key={`line-${arrivals}`} className={arrivals > 0 ? 'heat-bar-line is-reached' : 'heat-bar-line'} />
     </div>
   );
 }

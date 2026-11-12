@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useActions } from '../app/store';
 import type { View } from '../app/view';
 import type { ID } from '../data/model';
@@ -23,6 +23,11 @@ export function ItemList({ items, view, onComplete, showPlace = false, routinesS
   const actions = useActions();
   const [openId, setOpenId] = useState<ID | null>(null);
 
+  // Rows there when the list first appears come in with the screen. Any row that joins
+  // afterwards, such as the next suggestion or one brought back by undo, eases in on its own.
+  const [onScreen, setOnScreen] = useState(false);
+  useEffect(() => setOnScreen(true), []);
+
   /** A routine already done today is worth nothing more until tomorrow. */
   function temperature(item: ListItem): number {
     if (item.doneCompletionId !== null) return 0;
@@ -39,6 +44,7 @@ export function ItemList({ items, view, onComplete, showPlace = false, routinesS
           places={view.places}
           open={openId === item.id}
           stays={routinesStay && item.kind === 'routine'}
+          arrives={onScreen}
           onToggle={() => setOpenId(openId === item.id ? null : item.id)}
           onComplete={() => onComplete(item)}
           onUndo={() => item.doneCompletionId !== null && actions.undoCompletion(item.doneCompletionId)}

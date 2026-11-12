@@ -14,7 +14,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | | **Checkpoint 2: use it for a week** | |
 | M4 | Routines | Built 2026-11-12; not yet deployed or tried on an iPhone |
 | M5 | Nested projects | Built 2026-11-12; not yet deployed or tried on an iPhone |
-| M6 | Polish | Not started |
+| M6 | Polish | Built 2026-11-12; not yet deployed or tried on an iPhone |
 
 The first prototype is M1–M3.
 
@@ -164,6 +164,23 @@ Verified in a desktop browser at phone size: building a three-level tree, adding
 
 Animation pass, settings for threshold and day start, reduced-motion support.
 
+How it was built:
+
+- **Settings** sit at the foot of Projects, above the backup. "The line" is a slider with no number: the mark on the bar at the top of the screen moves as it is dragged. "A new day starts at" is a picker from midnight to 8 am.
+- **Settings are saved data**, so they travel in a backup. Adding them changed the saved format, which is now version 2. Data saved by earlier builds is upgraded on load and keeps everything else as it was; this is the first real migration.
+- **Changing the line** only moves the mark. It does not rescore anything. **Changing the day start** applies from now on; completions keep the day they were logged under.
+- **Animation pass:**
+  - the header eases between its two sizes, so the big bar on Today shrinks into the strip on the other screens
+  - each screen settles in when its tab is chosen
+  - a row that joins a list already on screen (the next suggestion, or one brought back by undo) eases in
+  - the ring gives under a press and swells as it fills on completion
+  - the editor, a section's rename panel and its add field drop in
+  - the mark on the bar glows once when HEAT climbs to it. Nothing is recorded, and moving the mark with the slider does not trigger it
+  - the mark has a dark edge so it stays readable over the bright end of the bar
+- **Reduced motion** is one global rule: every transition and animation lands on its end state at once, so a new animation cannot be forgotten. Rows also skip their fold-away delay.
+
+Verified on a production build in a desktop browser at phone size: old version-1 data loading and being saved as version 2, both settings, and each animation firing when it should. Reduced motion was checked only by confirming the rule is in the built stylesheet; it has not been tried with the system setting switched on. Not verified on an iPhone.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications.
@@ -185,6 +202,8 @@ Cloud sync, routine pause, notifications.
 | 11 | Completed tasks are not listed anywhere; the Undo toast is the only way back | Assumed at M3; revisit at checkpoint 2 |
 | 12 | Adding a task to an area or project is behind a plus button, not an always-visible field | Assumed at M5; revisit at checkpoint 2 |
 | 13 | Projects cannot be moved or reordered | Assumed at M5; add when it is missed |
+| 14 | The line can be set from 20 to 90, and the day start from midnight to 8 am | Assumed at M6 |
+| 15 | The mark on the bar glows once when HEAT reaches it, and nothing is kept of it | Assumed at M6; remove if it starts to feel like a daily pass or fail |
 
 ## Tuning log
 

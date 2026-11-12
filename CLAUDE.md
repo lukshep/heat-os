@@ -72,7 +72,8 @@ Import rules:
 - **Areas and projects are `Place`s**, flattened in reading order by `places()`. An item's area always matches its project's area; the reducer enforces it, and scoring only looks at the area.
 - **View preferences are not data.** Which sections are folded lives in localStorage (`src/app/collapsed.ts`), outside the state document and its backups.
 - **All records carry** `id`, `createdAt`, `updatedAt`, `deletedAt`. Delete by setting `deletedAt`.
-- **Changing the persisted shape** means bumping `schemaVersion` and adding a migration.
+- **Changing the persisted shape** means bumping `SCHEMA_VERSION`, adding a step to `migrate` in `src/data/storage.ts`, and testing that step against a document of the old shape. People have data saved by earlier builds.
+- **The config in force** is `heatConfig(state.settings)`: the tuned defaults with the person's own line and day start. Never read `DEFAULT_CONFIG` in `app/` or `screens/`.
 - **Engine changes need a test.** Unit tests use the round numbers in `src/heat/testConfig.ts`, never `DEFAULT_CONFIG`, so they do not move when the defaults are retuned.
 - **Retuning has a paper trail.** A change to `DEFAULT_CONFIG` must keep `scenarios.test.ts` passing, or change an invariant there on purpose. Either way, update the expected-behaviour table in `docs/SPEC.md` and add a line to the tuning log in `docs/PLAN.md`.
 
@@ -84,5 +85,7 @@ Import rules:
 - **Temperature colour** comes from `src/ui/temperature.ts` and is applied to marks (the ring, the bar), never to text.
 - **Saved data:** anything loaded from storage or a backup file goes through `parseState` before the app trusts it. Data the build cannot read is never overwritten.
 - **Mobile-first:** design at 390px wide, respect safe-area insets, 44px minimum touch targets.
-- **Motion:** short and restrained; honour `prefers-reduced-motion`.
+- **Motion:** short and restrained. `prefers-reduced-motion` is handled by one global rule at the end of `src/styles.css`, so new animations need nothing extra unless they delay an action in JavaScript.
+- **Testing in the browser:** the dev address (`localhost:5173`) may hold real data. Check before writing to it, and prefer the preview build on `localhost:4173` for tests that change saved data.
+- **Stale dev server:** after several quick edits to one file, the dev server here has served an out-of-date copy on a full reload. If the dev app breaks in a way the tests and typecheck do not explain, re-save the file or restart `npm run dev`.
 - **Git:** commit only when asked.

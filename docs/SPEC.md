@@ -67,6 +67,7 @@ interface AppState {
   tasks: Record<ID, Task>; routines: Record<ID, Routine>;
   completions: Record<ID, Completion>;
   deferred: { dayKey: DayKey; taskIds: ID[] };   // set aside from Today; local to the device
+  settings: { threshold: number; dayStartHour: number };
 }
 ```
 
@@ -78,6 +79,8 @@ interface AppState {
 - Routine warmth is derived by walking scheduled days after `warmthBase.asOf` against the days the routine was completed. Editing a schedule re-snapshots the base so history is not reinterpreted.
 - A routine keeps the id of the task it was made from, and a task made from a routine keeps the routine's id. The record it left behind is soft-deleted, so an id is live in at most one of the two collections.
 - A routine counts once per day. Its completion records the warmth it had at that moment and whether the day was scheduled.
+- `settings` holds the two parts of the HEAT config a person can change: where the line sits (20 to 90) and the hour a new day starts (midnight to 8 am). Everything else in the config is fixed by the build. Moving the line rescores nothing; a new day start applies from then on.
+- The saved format is at version 2. Version 1, from before settings existed, is upgraded on load.
 - `deferred` holds the tasks swapped out of Today's suggestions. It only counts on the day it was made and is not meant to sync.
 - Sync readiness consists of stable IDs, `updatedAt`, soft-delete tombstones, an append-only log, and a fold that ignores duplicates (one completion per task; one per routine per day).
 

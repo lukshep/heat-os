@@ -14,6 +14,8 @@ interface Props {
   open: boolean;
   /** The row stays in its list once completed, so it must not fold away. True for a routine outside Today. */
   stays: boolean;
+  /** The row joined a list that was already on screen, so it should ease in. Read once, when it appears. */
+  arrives: boolean;
   onToggle: () => void;
   onComplete: () => void;
   /** Takes back today's completion of a routine that is shown as done. */
@@ -37,6 +39,8 @@ function prefersReducedMotion(): boolean {
 export function ItemRow(props: Props) {
   const { item, temperature, open, context } = props;
   const [leaving, setLeaving] = useState(false);
+  // Fixed at the moment the row appears, so a later re-render cannot cut the animation short.
+  const [arrived] = useState(props.arrives);
   const done = item.doneCompletionId !== null;
 
   function complete() {
@@ -53,7 +57,9 @@ export function ItemRow(props: Props) {
     item.avoided && 'Avoided',
   ].filter(Boolean);
 
-  const className = ['row', leaving && 'is-leaving', done && 'is-done'].filter(Boolean).join(' ');
+  const className = ['row', arrived && 'is-entering', leaving && 'is-leaving', done && 'is-done']
+    .filter(Boolean)
+    .join(' ');
   const style = { '--temp': heatColor(temperature), '--glow': temperature.toFixed(3) } as CSSProperties;
 
   return (

@@ -1,9 +1,9 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
-import type { AppState, ID } from '../data/model';
+import type { AppState, ID, Settings } from '../data/model';
 import { reduce, type Action, type ItemPatch } from '../data/reducer';
-import { routineDays, routineWarmth, type ListItem } from '../data/selectors';
+import { heatConfig, routineDays, routineWarmth, type ListItem } from '../data/selectors';
 import type { StorageAdapter } from '../data/storage';
-import type { HeatConfig } from '../heat/config';
+
 import { addDays } from '../heat/day';
 import { isScheduledOn } from '../heat/warmth';
 import { clock, localDayKey } from './clock';
@@ -58,12 +58,16 @@ export interface Actions {
   deleteProject(id: ID): void;
   /** Sets a task aside from Today's suggestions for the rest of the day. */
   deferToday(taskId: ID): void;
+  /** Moves the line or the start of the day. */
+  updateSettings(patch: Partial<Settings>): void;
   replaceState(state: AppState): void;
 }
 
-export function createActions(store: AppStore, config: HeatConfig): Actions {
+export function createActions(store: AppStore): Actions {
   const newId = (): ID => crypto.randomUUID();
-  const dayOf = (at: number) => localDayKey(at, config.dayStartHour);
+  // Read afresh each time: the line and the day start are settings and can change.
+  const config = () => heatConfig(store.getState().settings);
+  const dayOf = (at: number) => localDayKey(at, config().dayStartHour);
 
   return {
     addTask: (title, areaId, projectId = null) =>
@@ -95,7 +99,7 @@ export function createActions(store: AppStore, config: HeatConfig): Actions {
       const routine = state.routines[item.id];
       if (!routine) return;
       // Settle everything up to yesterday under the old schedule; the new one applies from today.
-      const earned = routineWarmth(routine, routineDays(state).get(routine.id), today, config);
+      const earned = routineWarmth(routine, routineDays(state).get(routine.id), today, config());
       store.dispatch({ type: 'routine/setDays', id: routine.id, at, days, warmthBase: { ...earned, asOf: yesterday } });
     },
 
@@ -113,7 +117,7 @@ export function createActions(store: AppStore, config: HeatConfig): Actions {
       const routine = state.routines[item.id];
       if (routine) {
         // Worked out here, not taken from the row, in case the day turned over since it was drawn.
-        const { warmth } = routineWarmth(routine, routineDays(state).get(routine.id), dayKey, config);
+        const { warmth } = routineWarmth(routine, routineDays(state).get(routine.id), dayKey, config());
         const scheduled = isScheduledOn(routine.schedule, dayKey);
         store.dispatch({ type: 'routine/complete', id, at, dayKey, routineId: routine.id, warmth, scheduled });
       }
@@ -129,6 +133,11 @@ export function createActions(store: AppStore, config: HeatConfig): Actions {
     renameProject: (id, name) => store.dispatch({ type: 'project/rename', id, at: clock.touch(), name }),
     deleteProject: (id) => store.dispatch({ type: 'project/delete', id, at: clock.touch() }),
     deferToday: (taskId) => store.dispatch({ type: 'today/defer', dayKey: dayOf(clock.touch()), taskId }),
+    updateSettings(patch) {
+      store.dispatch({ type: 'settings/update', patch });
+      // The day may have just changed under a new start hour, so let every screen look again.
+      clock.touch();
+    },
     replaceState: (state) => store.dispatch({ type: 'state/replace', state }),
   };
 }
