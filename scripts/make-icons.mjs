@@ -7,7 +7,7 @@ import { crc32, deflateSync } from 'node:zlib';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
-const BACKGROUND = [0x14, 0x11, 0x0f];
+const BACKGROUND = [0x12, 0x12, 0x12];
 /** Colour by distance from the centre, as a share of the ember's radius. */
 const RAMP = [
   [0.0, [0xff, 0xf1, 0xc2]],

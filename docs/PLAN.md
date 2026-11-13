@@ -15,7 +15,8 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M4 | Routines | Deployed 2026-11-12; not yet tried on an iPhone |
 | M5 | Nested projects | Deployed 2026-11-12; not yet tried on an iPhone |
 | M6 | Polish | Deployed 2026-11-12; not yet tried on an iPhone |
-| M7 | Edge meter | Built 2026-11-12; not yet deployed or tried on an iPhone |
+| M7 | Edge meter | Deployed 2026-11-12; tried on an iPhone, corners judged good |
+| M8 | Neutral look and icon tab bar | Built 2026-11-12; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -205,6 +206,18 @@ Known weaknesses, to judge on the phone:
 
 Verified on a production build in a desktop browser at phone size: the line growing with each completion, the flare on a gain, the mark moving with the setting and answering when reached. Not verified on an iPhone, which is where every weakness above shows.
 
+### M8 — Neutral look and icon tab bar
+
+Asked for after seeing the edge meter on the phone.
+
+- **Neutral colour.** Backgrounds, text, lines and the plus button are all neutral grey. The only colour on a screen is temperature: the edge meter and the ring on each row. Delete keeps a muted red. This reverses the warm tint and orange accent from M3.
+- **Icon tab bar.** Five equal slots: Today and Projects, the plus button in the centre, then Inbox and Settings. Each tab is an icon with its name as the accessible label; the name still heads its screen.
+- **Settings is its own screen**, moved out of the foot of Projects. It holds the line, the day start and the backup.
+- **Today is headed "Today"**, in the same style as the other screens. The "HEAT" wordmark is gone from inside the app.
+- **The edge line sits hard against the glass.** On the phone it was a few points inside the left and right edges, so its inset went from 4 to 2 and its corner radius from 50 to 52 to keep the curve concentric.
+
+Verified on a production build in a desktop browser at phone size. Not yet seen on an iPhone; the inset change in particular is a guess from a description.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications.
@@ -229,6 +242,8 @@ Cloud sync, routine pause, notifications.
 | 14 | The line can be set from 20 to 90, and the day start from midnight to 8 am | Assumed at M6 |
 | 15 | The mark glows once when HEAT reaches it, and nothing is kept of it | Assumed at M6; remove if it starts to feel like a daily pass or fail |
 | 16 | HEAT is shown as a line round the edge of the screen, not a bar | Decided 2026-11-12; a side thermometer is the fallback if it reads poorly |
+| 17 | Everything that is not HEAT feedback is neutral grey; the only colour is temperature | Decided 2026-11-12 |
+| 18 | The tab bar is icons only, with the plus button in the centre and Settings as its own screen | Decided 2026-11-12 |
 
 ## Tuning log
 

@@ -18,6 +18,49 @@ export function PlusIcon() {
   );
 }
 
+/** The tab bar's icons. They are a little larger and lighter than the rest, since they stand alone. */
+const tab = { ...base, width: 24, height: 24, strokeWidth: 1.8 } as const;
+
+/** Today: a sun. */
+export function TodayIcon() {
+  return (
+    <svg {...tab}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" />
+    </svg>
+  );
+}
+
+/** Projects: a folder. */
+export function ProjectsIcon() {
+  return (
+    <svg {...tab}>
+      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2.2 2.5h7.2A2.5 2.5 0 0 1 21 10v6.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z" />
+    </svg>
+  );
+}
+
+/** Inbox: a tray. */
+export function InboxIcon() {
+  return (
+    <svg {...tab}>
+      <path d="M3 13.5 5.6 6.3A2 2 0 0 1 7.5 5h9a2 2 0 0 1 1.9 1.3L21 13.5V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M3 13.5h5l1.2 2.5h5.6l1.2-2.5h5" />
+    </svg>
+  );
+}
+
+/** Settings: two sliders. */
+export function SettingsIcon() {
+  return (
+    <svg {...tab}>
+      <path d="M4 8h9M17 8h3M4 16h3M11 16h9" />
+      <circle cx="15" cy="8" r="2" />
+      <circle cx="9" cy="16" r="2" />
+    </svg>
+  );
+}
+
 /** Points right when its section is folded; CSS turns it down when the section is open. */
 export function ChevronIcon() {
   return (

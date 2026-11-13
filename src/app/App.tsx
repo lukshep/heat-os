@@ -1,12 +1,13 @@
-import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import type { ID } from '../data/model';
 import { inArea, type ListItem } from '../data/selectors';
 import { Inbox } from '../screens/Inbox';
 import { Projects } from '../screens/Projects';
+import { Settings } from '../screens/Settings';
 import { Today } from '../screens/Today';
 import { EdgeMeter } from '../ui/EdgeMeter';
-import { PlusIcon } from '../ui/icons';
+import { InboxIcon, PlusIcon, ProjectsIcon, SettingsIcon, TodayIcon } from '../ui/icons';
 import { useActions } from './store';
 import { useView } from './view';
 
@@ -41,13 +42,17 @@ export function App({ saving }: Props) {
   return <Shell saving={saving} />;
 }
 
-type Tab = 'today' | 'projects' | 'inbox';
+type Tab = 'today' | 'projects' | 'inbox' | 'settings';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'today', label: 'Today' },
-  { id: 'projects', label: 'Projects' },
-  { id: 'inbox', label: 'Inbox' },
+/** The tab bar shows icons only, so each tab's name is its accessible label and its screen's heading. */
+const TABS: { id: Tab; label: string; Icon: () => ReactNode }[] = [
+  { id: 'today', label: 'Today', Icon: TodayIcon },
+  { id: 'projects', label: 'Projects', Icon: ProjectsIcon },
+  { id: 'inbox', label: 'Inbox', Icon: InboxIcon },
+  { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
+/** The plus button sits in the middle, with this many tabs before it. */
+const TABS_BEFORE_PLUS = 2;
 
 /** How long a completion can be taken back from the toast. */
 const UNDO_MS = 6000;
@@ -76,15 +81,30 @@ function Shell({ saving }: Props) {
     captureRef.current?.focus();
   }
 
+  function tabButton({ id, label, Icon }: (typeof TABS)[number]) {
+    const waiting = id === 'inbox' && hasInbox;
+    return (
+      <button
+        key={id}
+        className="tab"
+        type="button"
+        aria-label={waiting ? `${label}, with items waiting` : label}
+        aria-current={tab === id ? 'page' : undefined}
+        onClick={() => setTab(id)}
+      >
+        <Icon />
+        {waiting && <span className="tab-dot" />}
+      </button>
+    );
+  }
+
   return (
     <div className="app">
       {/* HEAT runs round the edge of every screen, so no screen needs a bar of its own. */}
       <EdgeMeter heat={view.heat.heat} threshold={view.config.threshold} />
 
       <header className="head">
-        <h1 className={tab === 'today' ? 'head-word' : 'head-title'}>
-          {tab === 'today' ? 'HEAT' : TABS.find((entry) => entry.id === tab)?.label}
-        </h1>
+        <h1 className="head-title">{TABS.find((entry) => entry.id === tab)?.label}</h1>
       </header>
 
       <main className="main" key={tab}>
@@ -96,6 +116,7 @@ function Shell({ saving }: Props) {
         {tab === 'today' && <Today view={view} onComplete={complete} />}
         {tab === 'projects' && <Projects view={view} onComplete={complete} />}
         {tab === 'inbox' && <Inbox view={view} onComplete={complete} captureRef={captureRef} />}
+        {tab === 'settings' && <Settings view={view} />}
       </main>
 
       {undo && (
@@ -114,21 +135,11 @@ function Shell({ saving }: Props) {
       )}
 
       <nav className="tabs" aria-label="Sections">
-        {TABS.map((entry) => (
-          <button
-            key={entry.id}
-            className="tab"
-            type="button"
-            aria-current={tab === entry.id ? 'page' : undefined}
-            onClick={() => setTab(entry.id)}
-          >
-            {entry.label}
-            {entry.id === 'inbox' && hasInbox && <span className="tab-dot" aria-label="has items" />}
-          </button>
-        ))}
+        {TABS.slice(0, TABS_BEFORE_PLUS).map(tabButton)}
         <button className="tabs-add" type="button" aria-label="Capture a task" onClick={capture}>
           <PlusIcon />
         </button>
+        {TABS.slice(TABS_BEFORE_PLUS).map(tabButton)}
       </nav>
     </div>
   );

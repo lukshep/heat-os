@@ -1,18 +1,23 @@
-/* HEAT is dark only: temperature colours are designed to glow against a dark surface. */
+/*
+ * HEAT is dark only, and everything that is not HEAT is neutral grey. The only colour on a
+ * screen is temperature: the line round the edge and the ring on each row. That keeps colour
+ * meaning one thing. The single exception is the muted red on delete.
+ */
 
 :root {
   color-scheme: dark;
 
-  --bg: #14110f;
-  --surface: #1e1a17;
-  --raised: #2a241f;
-  --text: #f2ede7;
-  --muted: #a69c91;
-  --faint: #7d736a;
-  --line: #322b25;
-  --accent: #ff8a4c;
-  --on-accent: #1a0f08;
-  --danger: #f08a80;
+  --bg: #121212;
+  --surface: #1c1c1c;
+  --raised: #272727;
+  --text: #ededed;
+  --muted: #a3a3a3;
+  --faint: #787878;
+  --line: #2e2e2e;
+  /* The "accent" is the brightest neutral: the plus button, a pressed chip, a focus ring. */
+  --accent: #e8e8e8;
+  --on-accent: #121212;
+  --danger: #d98d86;
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -78,7 +83,7 @@ button {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-/* Both headings take the same height, so the list does not jump when the tab changes. */
+/* Every screen is headed by its name, in the same place and the same size. */
 .head {
   display: flex;
   align-items: center;
@@ -86,19 +91,8 @@ button {
   padding: calc(env(safe-area-inset-top) + 16px) 20px 12px;
 }
 
-.head-word,
 .head-title {
   margin: 0;
-}
-
-.head-word {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.32em;
-}
-
-.head-title {
   font-size: 22px;
   font-weight: 700;
 }
@@ -553,23 +547,12 @@ button {
   margin-top: 24px;
 }
 
-/* Settings, at the foot of Projects. */
+/* The Settings screen. */
 
 .settings {
   display: grid;
-  gap: 22px;
-  margin: 36px 8px 0;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-}
-
-.settings-title {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  gap: 28px;
+  margin: 8px 8px 0;
 }
 
 .setting {
@@ -613,7 +596,6 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 20px;
-  margin-top: -14px;
 }
 
 /* Undo toast and tab bar. */
@@ -658,22 +640,28 @@ button {
   font-weight: 600;
 }
 
+/* Five equal slots: two screens, the plus button in the middle, two screens. Icons only. */
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr) auto;
+  grid-template-columns: repeat(5, 1fr);
   align-items: center;
-  gap: 4px;
+  justify-items: center;
   padding: 8px 12px calc(env(safe-area-inset-bottom) + 8px);
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
 
 .tab {
-  min-height: 48px;
-  border-radius: 12px;
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 600;
+  position: relative;
+  width: 56px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--faint);
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
 }
 
 .tab[aria-current='page'] {
@@ -681,20 +669,22 @@ button {
   color: var(--text);
 }
 
+/* Something is waiting in the Inbox. */
 .tab-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 6px;
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--bg);
   border-radius: 50%;
   background: var(--accent);
-  vertical-align: middle;
+  box-sizing: content-box;
 }
 
 .tabs-add {
-  width: 48px;
-  height: 48px;
-  margin-left: 4px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
   border-radius: 50%;

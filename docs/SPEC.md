@@ -27,7 +27,11 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 **Routines** are tasks that repeat. Giving a filed task one or more weekdays makes it a routine; clearing them makes it a one-off task again. A routine must live in an area. On Today it appears on its scheduled days until it is done. In its area it is always listed, shown as done for the rest of the day once completed, and can be completed on an unscheduled day too.
 
+**Settings** holds where the line sits, the hour a new day starts, and the backup.
+
 Tasks can be completed from any section. HEAT is shown on every screen, so every completion gives feedback wherever it happens.
+
+The tab bar is icons only: Today, Projects, a plus button in the centre for capture, Inbox and Settings. Everything that is not HEAT feedback is neutral grey, so colour on a screen always means temperature.
 
 ## Data model
 

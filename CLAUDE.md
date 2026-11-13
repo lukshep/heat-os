@@ -46,7 +46,7 @@ src/
   data/      model, reducer, selectors, storage
   app/       React glue: shell, store, clock, view, backup
   ui/        presentational components, temperature colour
-  screens/   Today, Projects, Inbox
+  screens/   Today, Projects, Inbox, Settings
   dev/       DEV-only simulator and tuning screen
 public/      icons and favicon
 scripts/     make-icons.mjs, which draws the icon PNGs
@@ -81,7 +81,7 @@ Import rules:
 
 - **Dependencies:** ask before adding any. Runtime: `react`, `react-dom`. Dev: `vite`, `@vitejs/plugin-react`, `typescript`, `vitest`, `vite-plugin-pwa`. No router, state library, CSS framework, chart library or animation library.
 - **TypeScript:** strict, with `noUncheckedIndexedAccess`.
-- **CSS:** plain CSS with custom properties. Colours come from tokens in `src/styles.css`. The app is dark only.
+- **CSS:** plain CSS with custom properties. Colours come from tokens in `src/styles.css`. The app is dark only, and everything that is not HEAT feedback is neutral grey: the only colour on a screen is temperature (the edge meter and the ring on each row), plus a muted red on delete. Do not add accent colours.
 - **Temperature colour** comes from `src/ui/temperature.ts` and is applied to marks (a row's ring, the edge meter), never to text.
 - **Saved data:** anything loaded from storage or a backup file goes through `parseState` before the app trusts it. Data the build cannot read is never overwritten.
 - **Mobile-first:** design at 390px wide, respect safe-area insets, 44px minimum touch targets.

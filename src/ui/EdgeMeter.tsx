@@ -14,13 +14,13 @@ const FLARE_STEP = 0.2;
 const COLD = 0.5;
 
 /** How far inside the edge the line's centre sits. */
-const INSET = 4;
+const INSET = 2;
 /**
  * Corner radius of the line. A web app cannot ask a phone how round its screen is, so this
- * is a middle value for recent iPhones and needs judging by eye on the device. In a
+ * is a value judged by eye on a recent iPhone, with the line hard against the glass. In a
  * browser window the app is a plain column, which takes a gentler corner.
  */
-const SCREEN_RADIUS = 50;
+const SCREEN_RADIUS = 52;
 const WINDOW_RADIUS = 20;
 
 /** True when installed on a phone, where the app is drawn right to the edges of the glass. */
