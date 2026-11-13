@@ -26,6 +26,17 @@ const WINDOW_RADIUS = 20;
 const LINE_WIDTH = 4;
 const SURGE_WIDTH = 5;
 
+/*
+ * Blurs, as standard deviations in pixels. They are SVG filters rather than CSS ones because
+ * Safari ignores a CSS filter on a shape inside an SVG, which left the line with no glow on
+ * an iPhone. The line's glow widens in Surge, by up to SURGE_GLOW at the peak.
+ */
+const GLOW = 3;
+const SURGE_GLOW = 6;
+const TIP_GLOW = 3.5;
+const FLARE_BLUR = 7;
+const SHIMMER_BLUR = 1.5;
+
 /** True when installed on a phone, where the app is drawn right to the edges of the glass. */
 function fillsPhoneScreen(): boolean {
   const installed =
@@ -104,11 +115,44 @@ export function EdgeMeter({ heat }: Props) {
     >
       {size.width > 0 && size.height > 0 && (
         <svg width={size.width} height={size.height} aria-hidden="true">
+          {/* sRGB blends the way CSS filters do; the SVG default, linearRGB, gives a harsher halo. */}
+          <defs>
+            <filter id="edge-glow" colorInterpolationFilters="sRGB">
+              <feGaussianBlur stdDeviation={(GLOW + SURGE_GLOW * surge).toFixed(2)} result="glow" />
+              <feMerge>
+                <feMergeNode in="glow" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="edge-tip-glow" colorInterpolationFilters="sRGB">
+              <feGaussianBlur stdDeviation={TIP_GLOW} />
+            </filter>
+            <filter id="edge-flare-blur" colorInterpolationFilters="sRGB">
+              <feGaussianBlur stdDeviation={FLARE_BLUR} />
+            </filter>
+            <filter id="edge-shimmer-blur" colorInterpolationFilters="sRGB">
+              <feGaussianBlur stdDeviation={SHIMMER_BLUR} />
+            </filter>
+          </defs>
           <path className="edge-track" d={path} />
-          {flares > 0 && <path key={flares} className="edge-flare" d={path} pathLength={FULL_HEAT} style={line} />}
-          <path className="edge-line" d={path} pathLength={FULL_HEAT} style={line} />
-          <path className="edge-tip" d={path} pathLength={FULL_HEAT} style={tip} />
-          {surge > 0 && <path className="edge-shimmer" d={path} pathLength={FULL_HEAT} />}
+          {flares > 0 && (
+            <path
+              key={flares}
+              className="edge-flare"
+              d={path}
+              pathLength={FULL_HEAT}
+              style={line}
+              filter="url(#edge-flare-blur)"
+            />
+          )}
+          <path className="edge-line" d={path} pathLength={FULL_HEAT} style={line} filter="url(#edge-glow)" />
+          <g className="edge-tip">
+            <path className="edge-tip-glow" d={path} pathLength={FULL_HEAT} style={tip} filter="url(#edge-tip-glow)" />
+            <path className="edge-tip-dot" d={path} pathLength={FULL_HEAT} style={tip} />
+          </g>
+          {surge > 0 && (
+            <path className="edge-shimmer" d={path} pathLength={FULL_HEAT} filter="url(#edge-shimmer-blur)" />
+          )}
         </svg>
       )}
     </div>

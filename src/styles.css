@@ -157,27 +157,40 @@ button {
   stroke-width: 3;
 }
 
-/* Width and glow both grow with Surge; below a full gauge --edge-surge is 0 and they rest. */
+/*
+ * Width and glow both grow with Surge; below a full gauge --edge-surge is 0 and they rest.
+ * The glows and blurs are SVG filters set in EdgeMeter.tsx: Safari ignores a CSS filter on
+ * a shape inside an SVG.
+ */
 .edge-line {
   stroke: var(--edge-color);
   stroke-width: var(--edge-width);
-  filter: drop-shadow(0 0 calc(6px + var(--edge-surge) * 12px) var(--edge-color));
   transition:
     stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
     stroke 700ms ease,
     stroke-width 700ms ease,
-    filter 700ms ease,
     opacity 300ms ease;
 }
 
-/* The bright leading end. It is what the eye follows when the line grows or cools. */
+/*
+ * The bright leading end: a white dot with a halo of the line's colour. It is what the eye
+ * follows when the line grows or cools.
+ */
 .edge-tip {
-  stroke: #fff;
+  transition: opacity 300ms ease;
+}
+
+.edge-tip path {
   stroke-width: 8;
-  filter: drop-shadow(0 0 7px var(--edge-color));
-  transition:
-    stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 300ms ease;
+  transition: stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.edge-tip-glow {
+  stroke: var(--edge-color);
+}
+
+.edge-tip-dot {
+  stroke: #fff;
 }
 
 /* Nothing to show when cold. In Surge the loop has closed, so there is no leading end. */
@@ -192,7 +205,6 @@ button {
   stroke: var(--edge-color);
   stroke-width: 12;
   opacity: 0;
-  filter: blur(7px);
   animation: edge-flare 900ms ease-out;
 }
 
@@ -212,7 +224,6 @@ button {
   stroke-width: calc(var(--edge-width) - 1px);
   stroke-dasharray: 9 91;
   opacity: calc(0.35 + var(--edge-surge) * 0.55);
-  filter: blur(1.5px);
   animation: edge-shimmer 7s linear infinite;
 }
 
