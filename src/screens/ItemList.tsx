@@ -3,7 +3,7 @@ import { useActions } from '../app/store';
 import type { View } from '../app/view';
 import type { ID } from '../data/model';
 import { placeLabel, scorable, type ListItem } from '../data/selectors';
-import { gainFor } from '../heat/engine';
+import { pointsNow } from '../heat/engine';
 import { ItemRow } from '../ui/ItemRow';
 import { temperatureOf } from '../ui/temperature';
 
@@ -18,7 +18,7 @@ interface Props {
   trailing?: ((item: ListItem) => ReactNode) | undefined;
 }
 
-/** A list of rows, each coloured by the HEAT it would add right now. One row opens at a time. */
+/** A list of rows, each coloured by the points it would earn right now. One row opens at a time. */
 export function ItemList({ items, view, onComplete, showPlace = false, routinesStay = false, trailing }: Props) {
   const actions = useActions();
   const [openId, setOpenId] = useState<ID | null>(null);
@@ -31,7 +31,7 @@ export function ItemList({ items, view, onComplete, showPlace = false, routinesS
   /** A routine already done today is worth nothing more until tomorrow. */
   function temperature(item: ListItem): number {
     if (item.doneCompletionId !== null) return 0;
-    return temperatureOf(gainFor(view.heat, scorable(item), view.config), view.config);
+    return temperatureOf(pointsNow(view.heat, scorable(item), view.config), view.config);
   }
 
   return (

@@ -250,10 +250,17 @@ export function foldHeat(
   return { heat: samples[0] ?? 0, now, today, areaCounts };
 }
 
-/** HEAT the item would add if completed right now. This is what an item's colour shows. */
+/**
+ * Points the item would earn if completed right now: its tags, its warmth and where it would
+ * fall in today's order. HEAT itself plays no part. This is what an item's colour shows.
+ */
+export function pointsNow(state: HeatState, item: Scorable, config: HeatConfig): number {
+  return pointsFor(item, positionOf(state.areaCounts, item), config);
+}
+
+/** HEAT the item would add if completed right now. Today's suggestions are chosen by it. */
 export function gainFor(state: HeatState, item: Scorable, config: HeatConfig): number {
-  const points = pointsFor(item, positionOf(state.areaCounts, item), config);
-  return applyGain(state.heat, points, config) - state.heat;
+  return applyGain(state.heat, pointsNow(state, item, config), config) - state.heat;
 }
 
 /** The state that would result from completing the item right now. */

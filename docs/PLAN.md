@@ -19,7 +19,8 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M8 | Neutral look and icon tab bar | Deployed 2026-11-12 |
 | M9 | Surge: no line, a gauge to 120 | Deployed 2026-11-12 |
 | M10 | Effort, Cooling and a reset | Deployed 2026-11-12; not yet tried on an iPhone |
-| M11 | Priority and Friction | Built 2026-11-12; not yet deployed |
+| M11 | Priority and Friction | Deployed 2026-11-12; not yet tried on an iPhone |
+| M12 | Rings show points, not HEAT | Built 2026-11-13; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -324,6 +325,18 @@ Current HEAT moves when this lands. HEAT is replayed from the log, so completion
 
 Verified: unit tests for the tag multiplier and the version 4 upgrade; scenario invariants rewritten on purpose for the new rule (20%, 30% and 50% wherever the task falls; a fresh area beats a tagged repeat; tags alone stay out of Surge) and the calibration snapshot updated. On a production build in a desktop browser at phone size, with made-up data: a task tagged Avoided in the old build arriving as Friction, with Priority off, on Today and in the editor; the document saved as version 5 at the next change, with no old names left; and completing it adding the Friction share. Not verified on an iPhone.
 
+### M12 — Rings show points, not HEAT
+
+Asked for after M11. A ring's colour no longer depends on where HEAT is (decision 31).
+
+- **What a ring shows.** The points the item would earn right now (its tags, its warmth and where it falls in today's order in its area), as a share of the most any item can earn, through the same 0.6 curve as before. The most is a fully warm routine with both tags, done first in the day: 45 points at the defaults. It used to be the HEAT the item would add, against a Priority task done from cold.
+- **Why.** HEAT scaled every item's gain by the same factor, so it never changed which ring was hottest, only how bright the whole list looked. In Surge every ring went cold. From cold, a Priority task, a Friction task and a warm routine all saturated to the same yellow, so tags and warmth could not be told apart.
+- **How it looks.** The rings now always look as they used to at a steady HEAT of about 75. A plain task in a fresh area is red, a repeat in a worked area violet, the Inbox magenta, a warm routine orange, and a warm routine with a tag close to yellow. On a plain task in a fresh area, Priority moves the ring about 0.06 along the gradient, Friction 0.09 and both 0.14, and a tag moves it by the same proportion wherever the item falls in its area.
+- **What was given up.** Cold rings in Surge were the sign that it is fine to stop. The edge line carries that alone now.
+- **Unchanged.** Today's suggestions are still chosen by the HEAT each item would add, which ranks items the same way. The saved data and `DEFAULT_CONFIG` are untouched, so there is no new schema version and no tuning-log entry.
+
+Verified: unit tests for `pointsNow` (independent of HEAT) and `temperatureOf` (1 at the most any item can earn and never more; tags and warmth by the same step anywhere in an area; unchanged by Effort). On a production build in a desktop browser at phone size, with made-up data: every ring's colour and glow identical with HEAT at 0 and at about 117, the values matching the model, and completing a Work task cooling the other Work rows while the Inbox row stayed as it was. Not verified on an iPhone, where the thing to judge is whether a tag's step is visible at a glance.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications.
@@ -362,6 +375,7 @@ Cloud sync, routine pause, notifications.
 | 28 | HEAT can be reset by hand from Settings, after a confirmation. The completion log is kept | Decided 2026-11-12 |
 | 29 | Priority adds 20% of a task's reward, Friction 30%, both 50%. The shares add, never multiply | Decided 2026-11-12 |
 | 30 | Important is renamed Priority and Avoided is renamed Friction, in the app, the code and the saved data | Decided 2026-11-12 |
+| 31 | A ring's colour shows the points the item would earn now, on a fixed scale topped by the most any item can earn. HEAT plays no part | Decided 2026-11-13 |
 
 ## Tuning log
 

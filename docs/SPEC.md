@@ -205,11 +205,13 @@ Warmth is a hidden value from 0 to 1 per routine. The area part of a fully warm 
 
 ### Colour
 
-An item's colour maps the HEAT it would add if completed now onto a continuous temperature gradient. It is recomputed whenever HEAT or the day's completions change, so every open task and routine always shows what it is currently worth:
+An item's colour maps the points it would earn if completed now onto a continuous temperature gradient. HEAT itself plays no part: a ring shows what the item is worth, and the edge shows how warm the person is. The scale is fixed, with the hottest colour at the most any item can earn, a fully warm routine with both tags done first in the day. Everyday items sit in the middle of the gradient, and the hot end is kept for warm routines and tagged items.
 
-- completing a task immediately cools the other items in its area
-- a tagged item stays warmer than the untagged ones in its area, all day
-- as HEAT climbs everything cools, and in Surge every ring is cold, because little is left to gain
+Colour is recomputed whenever the day's completions change, so every open task and routine always shows what it is currently worth:
+
+- completing a task immediately cools the other items in its area, and a new day warms them again
+- a tag or a routine's warmth always shows: the item is a step warmer than the plain ones beside it, by the same step wherever it falls in its area
+- the hottest ring is still the item that would add the most HEAT, since at any one moment HEAT scales every item's gain by the same factor
 
 The edge line uses the same gradient for HEAT itself and carries on past it in Surge, from yellow at 100 to a bright pale yellow at 120. Rows never reach that pale end.
 
@@ -228,7 +230,7 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 | The typical day is a guess | Everything is calibrated to two tasks in each of four areas being a balanced day | The gain scale is the one dial: lower it and the same day sits higher. Retune after real use |
 | Area proliferation | Every extra area still adds a first task worth more than a repeat | Keep areas few (about 4–6); the bonus shrinks with each one |
 | Task splitting | Twenty small tasks instead of one | Bounded at about 3.6 times one task, per area per day |
-| Cold rows at high HEAT | In Surge every ring is cold, so necessary work looks worthless | Intended as the sign that it is fine to stop. Below Surge, tagged items stay warmer than the untagged ones in their area |
+| Warm rows in Surge | Rings do not cool as HEAT climbs, so in Surge they look as inviting as ever and give no sign that it is fine to stop | The edge line carries that sign: in Surge it thickens, pales and a band travels round it. Rings stay true to what each item is worth |
 | Surge as a target | A thicker, brighter line could become the new thing to chase every day | It takes a huge day and fades within about a day. No record is kept and it is never named in the app |
 | No landmark on the edge | Without a mark, 70 and 85 are a short distance apart on a featureless line | Colour carries the level. Watch whether position still reads |
 | Warm routines carry a lot | Three warm routines and three tasks settle at 87, above a balanced day of eight tasks | Intended reward for consistency; the full-warmth bonus is the lever |

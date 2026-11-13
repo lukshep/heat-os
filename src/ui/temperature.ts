@@ -1,5 +1,5 @@
 import type { HeatConfig } from '../heat/config';
-import { applyGain, pointsFor, type DayPosition, type Scorable } from '../heat/engine';
+import { pointsFor, type DayPosition, type Scorable } from '../heat/engine';
 
 interface Stop {
   at: number;
@@ -52,19 +52,21 @@ export function heatColor(temperature: number): string {
   return 'oklch(0.975 0.07 102)';
 }
 
-/** The hottest ordinary thing: a first task in a fresh area, tagged Priority, done from cold. */
-const REFERENCE_ITEM: Scorable = { areaId: 'reference', priority: true, friction: false, warmth: 0 };
+/** The most any item can earn: a fully warm routine with both tags, the first thing done in a day. */
+const HOTTEST_ITEM: Scorable = { areaId: 'hottest', priority: true, friction: true, warmth: 1 };
 const START_OF_DAY: DayPosition = { inArea: 0, areasOpened: 0 };
 
-/** Below 1 this lifts small gains, so everyday items do not all crowd the cold end. */
+/** Below 1 this lifts small rewards, so everyday items do not all crowd the cold end. */
 const CURVE = 0.6;
 
 /**
- * Turns the HEAT an item would add right now into a temperature from 0 to 1. The scale is
- * anchored to the engine, so retuning the numbers does not shift every colour. Items never
- * go past 1: the pale end of the gradient belongs to Surge alone.
+ * Turns the points an item would earn right now into a temperature from 0 to 1, where 1 is the
+ * most any item can earn. HEAT plays no part, so a ring shows what the item is worth at any level
+ * of the gauge, and a tag or a routine's warmth always shows. The scale is anchored to the engine,
+ * so retuning the numbers does not shift every colour. Items never go past 1: the pale end of the
+ * gradient belongs to Surge alone.
  */
-export function temperatureOf(gain: number, config: HeatConfig): number {
-  const reference = applyGain(0, pointsFor(REFERENCE_ITEM, START_OF_DAY, config), config);
-  return reference > 0 ? Math.pow(clamp(gain / reference, FULL), CURVE) : 0;
+export function temperatureOf(points: number, config: HeatConfig): number {
+  const hottest = pointsFor(HOTTEST_ITEM, START_OF_DAY, config);
+  return hottest > 0 ? Math.pow(clamp(points / hottest, FULL), CURVE) : 0;
 }

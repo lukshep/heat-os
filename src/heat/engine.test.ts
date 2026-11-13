@@ -11,6 +11,7 @@ import {
   foldHeat,
   gainFor,
   pointsFor,
+  pointsNow,
   tagFactor,
   traceHeat,
   warmthFactor,
@@ -335,6 +336,15 @@ describe('pricing the next completion', () => {
     const worked: HeatState = { ...empty, heat: 50, areaCounts: { work: 6 } };
     const tagged: Scorable = { ...plain, priority: true };
     expect(gainFor(worked, tagged, config) / gainFor(worked, plain, config)).toBeCloseTo(1.25, 2);
+  });
+
+  it('prices points by where the item falls today, whatever HEAT is', () => {
+    const cold: HeatState = { ...empty, heat: 0, areaCounts: { work: 1, health: 1 } };
+    const surging: HeatState = { ...cold, heat: 110 };
+    // A repeat in Work is worth half a plain task; Home is the third area, so its bonus is a quarter.
+    expect(pointsNow(cold, plain, config)).toBeCloseTo(5, 10);
+    expect(pointsNow(cold, { ...plain, areaId: 'home' }, config)).toBeCloseTo(12.5, 10);
+    expect(pointsNow(surging, plain, config)).toBe(pointsNow(cold, plain, config));
   });
 
   it('agrees with replaying the log', () => {

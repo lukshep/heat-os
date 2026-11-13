@@ -7,7 +7,7 @@ import { describeDays, weekdayName, weekdayOrder } from './weekdays';
 
 interface Props {
   item: ListItem;
-  /** 0 (cold) to 1 (hottest): how much HEAT completing it would add right now. */
+  /** 0 (cold) to 1 (hottest): how many points completing it would earn right now, whatever HEAT is. */
   temperature: number;
   /** Every area and project, for choosing where the item lives. */
   places: readonly Place[];
