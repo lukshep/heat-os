@@ -193,8 +193,8 @@ export interface ListItem {
   areaId: ID | null;
   /** The project it sits in, or null for the top of its area. Never a project that no longer exists. */
   projectId: ID | null;
-  important: boolean;
-  avoided: boolean;
+  priority: boolean;
+  friction: boolean;
   createdAt: number;
   /** Weekdays a routine is due on (0 is Sunday). Empty for a task. */
   days: readonly number[];
@@ -223,8 +223,8 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
       title: routine.title,
       areaId: routine.areaId,
       projectId: projectOf(routine),
-      important: routine.important,
-      avoided: routine.avoided,
+      priority: routine.priority,
+      friction: routine.friction,
       createdAt: routine.createdAt,
       days: routine.schedule.days,
       warmth: routineWarmth(routine, days, today, config).warmth,
@@ -239,8 +239,8 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
     title: task.title,
     areaId: task.areaId,
     projectId: projectOf(task),
-    important: task.important,
-    avoided: task.avoided,
+    priority: task.priority,
+    friction: task.friction,
     createdAt: task.createdAt,
     days: [],
     warmth: 0,
@@ -253,7 +253,7 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
 
 /** What the engine needs to price an item. */
 export function scorable(item: ListItem): Scorable {
-  return { areaId: item.areaId, important: item.important, avoided: item.avoided, warmth: item.warmth };
+  return { areaId: item.areaId, priority: item.priority, friction: item.friction, warmth: item.warmth };
 }
 
 export type ItemCandidate = Candidate & { item: ListItem };

@@ -30,16 +30,16 @@ export interface Task extends Meta {
   /** Both null means the task is in the Inbox. */
   areaId: ID | null;
   projectId: ID | null;
-  important: boolean;
-  avoided: boolean;
+  priority: boolean;
+  friction: boolean;
 }
 
 export interface Routine extends Meta {
   title: string;
   areaId: ID;
   projectId: ID | null;
-  important: boolean;
-  avoided: boolean;
+  priority: boolean;
+  friction: boolean;
   schedule: Schedule;
   warmthBase: WarmthBase;
 }
@@ -55,8 +55,8 @@ export interface Completion extends Meta {
   itemId: ID;
   kind: 'task' | 'routine';
   areaId: ID | null;
-  important: boolean;
-  avoided: boolean;
+  priority: boolean;
+  friction: boolean;
   /** Routine warmth when completed; 0 for tasks. */
   warmth: number;
   /** For a routine, whether this was a scheduled day. */
@@ -136,9 +136,10 @@ export interface AppState {
  * Bump this, and add a step to `migrate` in storage.ts, whenever the persisted shape changes.
  * Version 2 added `settings`. Version 3 removed the threshold from them, when the line to
  * reach each day was dropped. Version 4 added Effort and Cooling to settings, as dated
- * changes, and the time HEAT was last reset.
+ * changes, and the time HEAT was last reset. Version 5 renamed the tags on tasks, routines
+ * and completions: `important` became `priority` and `avoided` became `friction`.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const SEED_AREA_NAMES = ['Work', 'Health', 'Home', 'People', 'Growth'];
 

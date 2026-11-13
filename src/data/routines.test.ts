@@ -152,16 +152,16 @@ describe('a routine through the week', () => {
 });
 
 describe('editing a routine', () => {
-  it('renames, flags and moves it, but never into the Inbox', () => {
+  it('renames, tags and moves it, but never into the Inbox', () => {
     const { state, health } = withRoutine();
     const home = areaId(state, 'Home');
     const moved = run(state, {
       type: 'routine/update',
       id: 'run',
       at: 4000,
-      patch: { title: ' Morning run ', important: true, areaId: home },
+      patch: { title: ' Morning run ', priority: true, areaId: home },
     });
-    expect(routineOn(moved, MONDAY)).toMatchObject({ title: 'Morning run', important: true, areaId: home });
+    expect(routineOn(moved, MONDAY)).toMatchObject({ title: 'Morning run', priority: true, areaId: home });
 
     const stuck = run(state, { type: 'routine/update', id: 'run', at: 4000, patch: { areaId: null } });
     expect(routineOn(stuck, MONDAY).areaId).toBe(health);
@@ -201,11 +201,11 @@ describe('editing a routine', () => {
     const later = run(
       state,
       complete('c1', MONDAY, 0.5),
-      { type: 'routine/update', id: 'run', at: 4000, patch: { areaId: home, avoided: true } },
+      { type: 'routine/update', id: 'run', at: 4000, patch: { areaId: home, friction: true } },
       { type: 'routine/delete', id: 'run', at: 4500 },
     );
     expect(liveCompletions(later)).toEqual([
-      expect.objectContaining({ areaId: health, avoided: false, warmth: 0.5 }),
+      expect.objectContaining({ areaId: health, friction: false, warmth: 0.5 }),
     ]);
     expect(listItems(later, TUESDAY, config)).toEqual([]);
   });
@@ -216,11 +216,11 @@ describe('going back to a one-off task', () => {
     const { state, health } = withRoutine();
     const back = run(
       state,
-      { type: 'routine/update', id: 'run', at: 4000, patch: { title: 'Morning run', avoided: true } },
+      { type: 'routine/update', id: 'run', at: 4000, patch: { title: 'Morning run', friction: true } },
       { type: 'routine/makeTask', id: 'run', at: 4500 },
     );
     expect(listItems(back, MONDAY, config)).toEqual([
-      expect.objectContaining({ id: 'run', kind: 'task', title: 'Morning run', avoided: true, areaId: health }),
+      expect.objectContaining({ id: 'run', kind: 'task', title: 'Morning run', friction: true, areaId: health }),
     ]);
     expect(back.routines.run?.deletedAt).toBe(4500);
   });

@@ -80,16 +80,16 @@ const SHAPES: Record<string, Record<string, Check>> = {
     title: isString,
     areaId: isStringOrNull,
     projectId: isStringOrNull,
-    important: isBoolean,
-    avoided: isBoolean,
+    priority: isBoolean,
+    friction: isBoolean,
   },
   routines: {
     ...META,
     title: isString,
     areaId: isString,
     projectId: isStringOrNull,
-    important: isBoolean,
-    avoided: isBoolean,
+    priority: isBoolean,
+    friction: isBoolean,
     schedule: (value) => isDict(value) && Array.isArray(value.days) && value.days.every(isNumber),
     warmthBase: (value) =>
       isDict(value) && isNumber(value.warmth) && isNumber(value.missRun) && isString(value.asOf),
@@ -101,8 +101,8 @@ const SHAPES: Record<string, Record<string, Check>> = {
     itemId: isString,
     kind: (value) => value === 'task' || value === 'routine',
     areaId: isStringOrNull,
-    important: isBoolean,
-    avoided: isBoolean,
+    priority: isBoolean,
+    friction: isBoolean,
     warmth: isNumber,
     scheduled: isBoolean,
   },
@@ -141,7 +141,33 @@ function migrate(raw: Dict): Dict | null {
     document = { ...document, schemaVersion: 4, settings, heatResetAt: null };
   }
 
+  // Version 5 renamed the tags: Important became Priority, and Avoided became Friction.
+  if (document.schemaVersion === 4) {
+    document = {
+      ...document,
+      schemaVersion: 5,
+      tasks: renameTags(document.tasks),
+      routines: renameTags(document.routines),
+      completions: renameTags(document.completions),
+    };
+  }
+
   return document.schemaVersion === SCHEMA_VERSION ? document : null;
+}
+
+/** A collection with each record's `important` and `avoided` renamed `priority` and `friction`. */
+function renameTags(collection: unknown): unknown {
+  if (!isDict(collection)) return collection;
+  const renamed: Dict = {};
+  for (const [id, record] of Object.entries(collection)) {
+    if (!isDict(record)) {
+      renamed[id] = record;
+      continue;
+    }
+    const { important, avoided, ...rest } = record;
+    renamed[id] = { ...rest, priority: important, friction: avoided };
+  }
+  return renamed;
 }
 
 /**

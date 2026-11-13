@@ -30,22 +30,58 @@ function current(): Record<string, any> {
   return JSON.parse(JSON.stringify(state));
 }
 
+/** A collection with its tags under the names every version before 5 saved them by. */
+function oldTags(collection: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(collection).map(([id, { priority, friction, ...rest }]) => [
+      id,
+      { ...rest, important: priority, avoided: friction },
+    ]),
+  );
+}
+
+/** The same collection with its tags under their current names. */
+function newTags(collection: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(collection).map(([id, { important, avoided, ...rest }]) => [
+      id,
+      { ...rest, priority: important, friction: avoided },
+    ]),
+  );
+}
+
+/** A current document as a build before version 5 would have saved it. */
+function beforeTagRename(): Record<string, any> {
+  const document = current();
+  return {
+    ...document,
+    tasks: oldTags(document.tasks),
+    routines: oldTags(document.routines),
+    completions: oldTags(document.completions),
+  };
+}
+
 /** What the app saved before settings existed: version 1, with no settings at all. */
 function versionOne(): Record<string, any> {
-  const { settings: _added, ...rest } = current();
+  const { settings: _added, ...rest } = beforeTagRename();
   return { ...rest, schemaVersion: 1 };
 }
 
 /** What the app saved while there was a line to reach: version 2, with a threshold. */
 function versionTwo(threshold = 75, dayStartHour = 6): Record<string, any> {
-  const { heatResetAt: _added, ...rest } = current();
+  const { heatResetAt: _added, ...rest } = beforeTagRename();
   return { ...rest, schemaVersion: 2, settings: { threshold, dayStartHour } };
 }
 
 /** What the app saved before Effort, Cooling and the reset: version 3, with only the day start. */
 function versionThree(dayStartHour = 6): Record<string, any> {
-  const { heatResetAt: _added, ...rest } = current();
+  const { heatResetAt: _added, ...rest } = beforeTagRename();
   return { ...rest, schemaVersion: 3, settings: { dayStartHour } };
+}
+
+/** What the app saved before the tags were renamed: version 4, with Important and Avoided. */
+function versionFour(): Record<string, any> {
+  return { ...beforeTagRename(), schemaVersion: 4 };
 }
 
 describe('settings', () => {
@@ -92,8 +128,8 @@ describe('saved data from before settings (version 1)', () => {
   it('keeps everything else exactly as it was', () => {
     const old = versionOne();
     const state = parseState(old);
-    expect(state?.tasks).toEqual(old.tasks);
-    expect(state?.completions).toEqual(old.completions);
+    expect(state?.tasks).toEqual(newTags(old.tasks));
+    expect(state?.completions).toEqual(newTags(old.completions));
     expect(state?.areas).toEqual(old.areas);
     expect(state?.deferred).toEqual(old.deferred);
   });
@@ -115,8 +151,8 @@ describe('saved data from when there was a line to reach (version 2)', () => {
   it('keeps everything else exactly as it was', () => {
     const old = versionTwo();
     const state = parseState(old);
-    expect(state?.tasks).toEqual(old.tasks);
-    expect(state?.completions).toEqual(old.completions);
+    expect(state?.tasks).toEqual(newTags(old.tasks));
+    expect(state?.completions).toEqual(newTags(old.completions));
     expect(state?.areas).toEqual(old.areas);
   });
 
@@ -259,8 +295,8 @@ describe('saved data from before Effort, Cooling and the reset (version 3)', () 
   it('keeps everything else exactly as it was', () => {
     const old = versionThree();
     const state = parseState(old);
-    expect(state?.tasks).toEqual(old.tasks);
-    expect(state?.completions).toEqual(old.completions);
+    expect(state?.tasks).toEqual(newTags(old.tasks));
+    expect(state?.completions).toEqual(newTags(old.completions));
     expect(state?.areas).toEqual(old.areas);
     expect(state?.deferred).toEqual(old.deferred);
   });
@@ -316,5 +352,56 @@ describe('saved Effort, Cooling and reset', () => {
     const missing = current();
     delete missing.heatResetAt;
     expect(parseState(missing)).toBeNull();
+  });
+});
+
+describe('saved data from before the tags were renamed (version 4)', () => {
+  /** A version 4 document whose task, routine and completion carry tags. */
+  function tagged(): Record<string, any> {
+    const old = versionFour();
+    old.tasks.t1.important = true;
+    old.completions.c1.avoided = true;
+    old.routines.r1 = { ...old.tasks.t1, id: 'r1', areaId: 'a1', important: false, avoided: true };
+    old.routines.r1.schedule = { days: [1] };
+    old.routines.r1.warmthBase = { warmth: 0, missRun: 0, asOf: '2026-01-04' };
+    return old;
+  }
+
+  it('renames Important to Priority and Avoided to Friction, keeping every value', () => {
+    const state = parseState(tagged());
+    expect(state?.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(state?.tasks.t1).toMatchObject({ priority: true, friction: false });
+    expect(state?.routines.r1).toMatchObject({ priority: false, friction: true });
+    expect(state?.completions.c1).toMatchObject({ priority: false, friction: true });
+  });
+
+  it('leaves no trace of the old names', () => {
+    const state = parseState(tagged());
+    for (const record of [state?.tasks.t1, state?.routines.r1, state?.completions.c1]) {
+      expect(record).not.toHaveProperty('important');
+      expect(record).not.toHaveProperty('avoided');
+    }
+  });
+
+  it('keeps everything else exactly as it was', () => {
+    const old = tagged();
+    const state = parseState(old);
+    expect(state?.tasks).toEqual(newTags(old.tasks));
+    expect(state?.completions).toEqual(newTags(old.completions));
+    expect(state?.settings).toEqual(old.settings);
+    expect(state?.areas).toEqual(old.areas);
+  });
+
+  it('does not alter the document it was given', () => {
+    const old = tagged();
+    const before = JSON.stringify(old);
+    parseState(old);
+    expect(JSON.stringify(old)).toBe(before);
+  });
+
+  it('is refused when a record has lost a tag', () => {
+    const old = tagged();
+    delete old.tasks.t1.important;
+    expect(parseState(old)).toBeNull();
   });
 });

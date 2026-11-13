@@ -58,7 +58,7 @@ describe('parseState', () => {
 
   it('rejects a record with a field of the wrong type', () => {
     const damaged = copy(populated());
-    damaged.tasks.t1.important = 'yes';
+    damaged.tasks.t1.priority = 'yes';
     expect(parseState(damaged)).toBeNull();
 
     const badKind = copy(populated());

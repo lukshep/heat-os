@@ -52,8 +52,8 @@ export function heatColor(temperature: number): string {
   return 'oklch(0.975 0.07 102)';
 }
 
-/** The hottest ordinary thing: a first task in a fresh area, marked Important, done from cold. */
-const REFERENCE_ITEM: Scorable = { areaId: 'reference', important: true, avoided: false, warmth: 0 };
+/** The hottest ordinary thing: a first task in a fresh area, tagged Priority, done from cold. */
+const REFERENCE_ITEM: Scorable = { areaId: 'reference', priority: true, friction: false, warmth: 0 };
 const START_OF_DAY: DayPosition = { inArea: 0, areasOpened: 0 };
 
 /** Below 1 this lifts small gains, so everyday items do not all crowd the cold end. */

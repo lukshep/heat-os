@@ -67,8 +67,8 @@ Import rules:
 
 - **HEAT is derived, never stored.** The completion log is the single source of truth; `foldHeat` replays it from the last reset (`heatCompletions`). Undo removes a completion; nothing else needs repair. A reset stores only its time, never a HEAT value.
 - **Every tunable number lives in `HeatConfig`** (`src/heat/config.ts`). No magic numbers in the engine or UI. Beside it as constants: the gauge's two fixed points, `FULL_HEAT` (100, one full loop of the edge) and `MAX_HEAT` (120, the ceiling of Surge), and the Effort and Cooling steps.
-- **Important and Avoided are flat bonuses**, added after the area factor and warmth. Nothing diminishes them.
-- **Completions are immutable facts** (when, which item, area, flags, warmth, day), never scores. Editing or deleting an item later must not rewrite past HEAT.
+- **Priority and Friction are a share of the task's own reward**: 20%, 30%, and 50% for both. The shares add, never multiply, and apply after the area factor and warmth, so they shrink with the area's diminishing returns. Use these names everywhere; Important and Avoided are the old ones.
+- **Completions are immutable facts** (when, which item, area, tags, warmth, day), never scores. Editing or deleting an item later must not rewrite past HEAT.
 - **"Done" is derived** from the completion log. Tasks have no `completedAt`; a routine is done today if the log holds a completion for today.
 - **Routine warmth is derived**, never stored as a running value. Only `warmthBase` is saved, and it is re-snapshotted when a schedule changes.
 - **Screens list `ListItem`s** (`src/data/selectors.ts`), one shape for tasks and routines. A task and the routine made from it share an id.

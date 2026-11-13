@@ -17,10 +17,13 @@ export interface HeatConfig {
   areaBonusDecay: number;
   /** Each further completion in the same area that day is worth this share of the one before. */
   repeatDecay: number;
-  /** Flat extra for an Important item, as a share of a plain task. Never diminished. */
-  importantBonus: number;
-  /** Flat extra for an Avoided item, as a share of a plain task. Never diminished. */
-  avoidedBonus: number;
+  /**
+   * Extra share of an item's own reward for the Priority tag: what matters most right now.
+   * 0.2 means 20% more. It adds to Friction's share; the two never multiply.
+   */
+  priorityBonus: number;
+  /** The same for the Friction tag: hard to start, not necessarily hard to do. */
+  frictionBonus: number;
   /** Added to an item's multiplier for a routine at full warmth. */
   warmthBonus: number;
   /** Share of the gap to full warmth closed by completing a routine on a scheduled day. */
@@ -42,8 +45,8 @@ export const DEFAULT_CONFIG: HeatConfig = {
   firstInAreaBonus: 0.5,
   areaBonusDecay: 0.7,
   repeatDecay: 0.8,
-  importantBonus: 0.75,
-  avoidedBonus: 0.75,
+  priorityBonus: 0.2,
+  frictionBonus: 0.3,
   warmthBonus: 1,
   warmthStep: 0.25,
   missStep: 0.2,

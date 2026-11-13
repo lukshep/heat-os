@@ -12,7 +12,7 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 - Temperature and colour are the primary feedback. Users should recognise the most rewarding action without reading numbers.
 - HEAT is a living gauge, not a checklist and not a score to maximise. Nothing marks a day as passed or failed.
 - Balanced activity across life areas is rewarded more than volume in one area.
-- Important and Avoided tasks are always worth substantially more, wherever they fall in the day.
+- Two optional tags make a task worth more: Priority for what matters most right now, and Friction for what is hard to start, not necessarily hard to do.
 - Consistency pays: routines kept reliably are worth more, and lapse quickly when missed.
 - Occasional inactivity is not punished, and recovery is immediately rewarding.
 - A full gauge is difficult and uncommon. Surge is a temporary buffer of momentum, not a state to hold.
@@ -49,12 +49,12 @@ interface Project extends Meta { name: string; areaId: ID; parentId: ID | null; 
 interface Task extends Meta {
   title: string; note?: string;
   areaId: ID | null; projectId: ID | null;   // both null = Inbox
-  important: boolean; avoided: boolean;
+  priority: boolean; friction: boolean;
 }
 
 interface Routine extends Meta {
   title: string; areaId: ID; projectId: ID | null;
-  important: boolean; avoided: boolean;
+  priority: boolean; friction: boolean;
   schedule: { days: number[] };              // weekdays 0-6 (0 = Sunday); all seven = daily
   warmthBase: { warmth: number; missRun: number; asOf: DayKey };
 }
@@ -62,7 +62,7 @@ interface Routine extends Meta {
 interface Completion extends Meta {          // activity history
   at: number; dayKey: DayKey;
   itemId: ID; kind: 'task' | 'routine';
-  areaId: ID | null; important: boolean; avoided: boolean;
+  areaId: ID | null; priority: boolean; friction: boolean;
   warmth: number;                            // routine warmth when completed; 0 for tasks
   scheduled: boolean;                        // routine: was this a scheduled day
 }
@@ -92,7 +92,7 @@ interface AppState {
 - `settings` holds the parts of the HEAT config a person can change: the hour a new day starts (midnight to 8 am), and Effort and Cooling. Everything else in the config is fixed by the build. A new day start applies from then on.
 - `settings.tuning` is every change of Effort and Cooling, oldest first, each with the moment it was made. Before the first both were Standard, and the last is in force now. The log is kept rather than just the current values because HEAT is replayed with whichever settings were in force at each moment.
 - `heatResetAt` is when HEAT was last reset. HEAT counts only completions after it. The completion log itself is untouched, so what was done stays done.
-- The saved format is at version 4. Version 1, from before settings existed, version 2, which also held the position of the line that used to be reached each day, and version 3, from before Effort, Cooling and the reset, are upgraded on load. The upgraded shape is written at the next change.
+- The saved format is at version 5. Version 1, from before settings existed, version 2, which also held the position of the line that used to be reached each day, version 3, from before Effort, Cooling and the reset, and version 4, which saved the tags as `important` and `avoided`, are upgraded on load. The upgraded shape is written at the next change.
 - `deferred` holds the tasks swapped out of Today's suggestions. It only counts on the day it was made and is not meant to sync.
 - Sync readiness consists of stable IDs, `updatedAt`, soft-delete tombstones, an append-only log, and a fold that ignores duplicates (one completion per task; one per routine per day).
 
@@ -118,19 +118,19 @@ The two rates meet at 100, so the curve has no jump. From the ceiling of 120, HE
 What a completion is worth before HEAT resistance:
 
 ```
-points = base * areaFactor * (1 + warmth) + flags        base = 10
+points = base * areaFactor * (1 + warmth) * (1 + tags)        base = 10
 
 areaFactor = 0.8^n                          n = completions already logged in that area today
            + 0.5 * 0.7^k   when n = 0       k = areas already opened today
 
-flags = 7.5 if Important + 7.5 if Avoided   flat, never diminished
+tags = 0.2 if Priority + 0.3 if Friction    added, never multiplied: both is 0.5
 ```
 
 - **Within an area** each further task is worth 80% of the one before. Plain tasks in the day's first area score 15, 8, 6.4, 5.1, 4.1, so several tasks in an area stay worthwhile.
 - **The first task in an area** earns a bonus of half a plain task. Each further area opened that day earns 70% of the previous area's bonus, so first tasks score 15, 13.5, 12.4, 11.7, 11.2, 10.8. A first task in a new area is always worth more than a repeat.
 - **An area's daily ceiling** is 55 points from plain tasks, however many are completed or however finely they are split.
-- **Flags** are added after everything else, so neither the area's diminishing returns nor anything done earlier in the day reduces them. An Important task that is the fifth in its area scores 4.1 + 7.5. One that is both Important and Avoided scores 4.1 + 15, more than a first task in a fresh area.
-- **Warmth** doubles the area part of a fully warm routine. It does not multiply the flags.
+- **Tags** add a share of the task's own reward: 20% for Priority, 30% for Friction, 50% for both. The two shares add; they never multiply each other. Because they scale the reward, they shrink with it: a first task in a fresh area scores 15 plain and 22.5 with both tags, the fifth in an area 4.1 and 6.1. A first task in a fresh area is always worth more than a tagged repeat.
+- **Warmth** doubles a fully warm routine's reward, and tags apply on top: a fully warm routine tagged Priority earns 2 × 1.2 times a plain task's.
 - **Inbox tasks** with no area earn no bonus and do not count as an opened area.
 
 The area day starts at 04:00 local. Each completion stores its own `dayKey`, so travel never rescores history.
@@ -156,15 +156,16 @@ The same pattern every day, completed in one sitting. HEAT swings between a dail
 | One task in each of 5 areas | 64 | 76 | 61 | None |
 | Light day: two tasks in each of 3 areas | 65 | 77 | 61 | None |
 | Balanced day: two tasks in each of 4 areas | 85 | 85 | 68 | None |
-| Balanced day, one task Important and one Avoided | 100 | 90 | 72 | None |
-| Big day: three tasks in each of 4 areas, one Important and one Avoided | 125 | 96 | 77 | None |
-| Huge day: a big day with two Important, two Avoided and three warm routines | 194 | 107 | 88 | 43% |
+| Balanced day, its first task tagged Priority and Friction | 92 | 87 | 70 | None |
+| Big day: three tasks in each of 4 areas, the first tagged with both | 118 | 94 | 75 | None |
+| Huge day: a big day with its first two tasks tagged with both, and three warm routines | 175 | 104 | 85 | 27% |
+| Balanced day with every task tagged with both | 127 | 96 | 77 | None |
 | One area, unlimited tasks | at most 55 | 71 | 57 | None |
 | Three warm routines and three tasks, spread through the day | 103 | 87 | 76 | None |
 
 - **Where consistency sits.** A balanced day, kept up, moves between 68 and 85. It never fills the gauge, however long it is kept up.
-- **Surge is uncommon.** A full gauge needs about two and a half balanced days of points in one day. A huge day kept up every day spends under half its time in Surge and is back below 100 before the next day's work.
-- **Flags matter.** Two flagged tasks lift a balanced day from 85 to 90.
+- **Surge is uncommon.** A full gauge needs about two and a half balanced days of points in one day. A huge day kept up every day spends about a quarter of its time in Surge and is back below 100 before the next day's work. Tags alone cannot get there: a balanced day with every task tagged with both peaks at 96.
+- **Tags lift a little.** Both tags on a balanced day's first task take its peak from 85 to 87.
 - **Balance.** Breadth pays more per task than depth, and one area alone tops out at 71.
 - **Rest is not punished.** From 85, HEAT is 68 after one day off and 54 after two. After a week away it is back above 70 on the third balanced day.
 - **Recovery.** From zero the first task adds about 8. Balanced days peak at 39, 60, 72, 78 and 81.
@@ -207,7 +208,7 @@ Warmth is a hidden value from 0 to 1 per routine. The area part of a fully warm 
 An item's colour maps the HEAT it would add if completed now onto a continuous temperature gradient. It is recomputed whenever HEAT or the day's completions change, so every open task and routine always shows what it is currently worth:
 
 - completing a task immediately cools the other items in its area
-- flagged items stay visibly warmer than the plain ones beside them, all day
+- a tagged item stays warmer than the untagged ones in its area, all day
 - as HEAT climbs everything cools, and in Surge every ring is cold, because little is left to gain
 
 The edge line uses the same gradient for HEAT itself and carries on past it in Surge, from yellow at 100 to a bright pale yellow at 120. Rows never reach that pale end.
@@ -222,12 +223,12 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 
 | Risk | What happens | Default response |
 |---|---|---|
-| Flag inflation (largest) | Flags are no longer diminished, so flagging all eight tasks of a balanced day scores 205 points, peaks at 108 and spends 47% of the time in Surge | Self-policing: the flags only mean something if used honestly. Fallbacks: a smaller flat bonus, or only the first few flags of a day at full value |
+| Tag inflation | Tagging all eight tasks of a balanced day with both tags scores 127 points and peaks at 96, short of Surge | Small now that tags are a share of the reward. The tags still only mean something if used honestly |
 | Trivial-task breadth farming | With no task size, one trivial task in each of five areas settles at 76, inside the band meant for balanced activity | Accepted now that there is no line to pass. Fallback: an optional effort size |
 | The typical day is a guess | Everything is calibrated to two tasks in each of four areas being a balanced day | The gain scale is the one dial: lower it and the same day sits higher. Retune after real use |
 | Area proliferation | Every extra area still adds a first task worth more than a repeat | Keep areas few (about 4–6); the bonus shrinks with each one |
 | Task splitting | Twenty small tasks instead of one | Bounded at about 3.6 times one task, per area per day |
-| Cold rows at high HEAT | In Surge every ring is cold, so necessary work looks worthless | Intended as the sign that it is fine to stop. Below Surge, flagged items stay the warmest on the list |
+| Cold rows at high HEAT | In Surge every ring is cold, so necessary work looks worthless | Intended as the sign that it is fine to stop. Below Surge, tagged items stay warmer than the untagged ones in their area |
 | Surge as a target | A thicker, brighter line could become the new thing to chase every day | It takes a huge day and fades within about a day. No record is kept and it is never named in the app |
 | No landmark on the edge | Without a mark, 70 and 85 are a short distance apart on a featureless line | Colour carries the level. Watch whether position still reads |
 | Warm routines carry a lot | Three warm routines and three tasks settle at 87, above a balanced day of eight tasks | Intended reward for consistency; the full-warmth bonus is the lever |
@@ -237,4 +238,4 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 | Settings as a lever | Switching to Easier for a burst of work and back again keeps what was earned under Easier | Accepted for a personal app. The confirmation is the friction |
 | Stacked settings | Easier and Slower together put a balanced day at 99, just short of a full gauge | Accepted: both were chosen. The scenario tests keep a balanced day out of Surge on every combination |
 
-One ordering effect is intended: completing the warm item first in an area earns more than completing a plain one first. Flags have no ordering effect, since they are paid in full wherever they fall.
+One ordering effect is intended: completing the warm or tagged item first in an area earns more than completing a plain one first, because warmth and tags are both a share of a reward that shrinks with each task in the area.

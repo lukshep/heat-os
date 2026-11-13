@@ -19,7 +19,7 @@ import {
  * or give `areaId` alone for the top of an area; a null `areaId` is the Inbox. A routine
  * ignores a move to the Inbox: it must have a home.
  */
-export type ItemPatch = Partial<Pick<Task, 'title' | 'areaId' | 'projectId' | 'important' | 'avoided'>>;
+export type ItemPatch = Partial<Pick<Task, 'title' | 'areaId' | 'projectId' | 'priority' | 'friction'>>;
 
 /**
  * Everything that can change the state. Actions carry their own ids, times and day keys,
@@ -118,8 +118,8 @@ function requestedHome(state: AppState, patch: ItemPatch): Home | null {
 function patched<T extends Task | Routine>(record: T, patch: ItemPatch, at: number): T {
   const next = { ...record, updatedAt: at };
   if (patch.title !== undefined && patch.title.trim()) next.title = patch.title.trim();
-  if (patch.important !== undefined) next.important = patch.important;
-  if (patch.avoided !== undefined) next.avoided = patch.avoided;
+  if (patch.priority !== undefined) next.priority = patch.priority;
+  if (patch.friction !== undefined) next.friction = patch.friction;
   return next;
 }
 
@@ -133,8 +133,8 @@ function demote(state: AppState, routine: Routine, areaId: ID | null, at: number
     title: routine.title,
     areaId,
     projectId: areaId === null ? null : routine.projectId,
-    important: routine.important,
-    avoided: routine.avoided,
+    priority: routine.priority,
+    friction: routine.friction,
   };
   return {
     tasks: { ...state.tasks, [task.id]: task },
@@ -156,8 +156,8 @@ export function reduce(state: AppState, action: Action): AppState {
         deletedAt: null,
         title,
         ...home,
-        important: false,
-        avoided: false,
+        priority: false,
+        friction: false,
       };
       return { ...state, tasks: { ...state.tasks, [task.id]: task } };
     }
@@ -193,8 +193,8 @@ export function reduce(state: AppState, action: Action): AppState {
         itemId: task.id,
         kind: 'task',
         areaId: task.areaId,
-        important: task.important,
-        avoided: task.avoided,
+        priority: task.priority,
+        friction: task.friction,
         warmth: 0,
         scheduled: false,
       };
@@ -215,8 +215,8 @@ export function reduce(state: AppState, action: Action): AppState {
         title: task.title,
         areaId: task.areaId,
         projectId: task.projectId,
-        important: task.important,
-        avoided: task.avoided,
+        priority: task.priority,
+        friction: task.friction,
         schedule: { days },
         warmthBase: { warmth: 0, missRun: 0, asOf: action.asOf },
       };
@@ -282,8 +282,8 @@ export function reduce(state: AppState, action: Action): AppState {
         itemId: routine.id,
         kind: 'routine',
         areaId: routine.areaId,
-        important: routine.important,
-        avoided: routine.avoided,
+        priority: routine.priority,
+        friction: routine.friction,
         warmth: Math.min(1, Math.max(0, action.warmth)),
         scheduled: action.scheduled,
       };

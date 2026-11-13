@@ -83,19 +83,19 @@ describe('tasks', () => {
     expect(openTasks(state).map((task) => task.id)).toEqual(['old', 'new']);
   });
 
-  it('renames, flags and moves a task', () => {
+  it('renames, tags and moves a task', () => {
     const start = fresh();
     const home = areaId(start, 'Home');
     const state = run(start, addTask('t1', 'Fix tap'), {
       type: 'task/update',
       id: 't1',
       at: 2500,
-      patch: { title: ' Fix the tap ', important: true, avoided: true, areaId: home },
+      patch: { title: ' Fix the tap ', priority: true, friction: true, areaId: home },
     });
     expect(state.tasks.t1).toMatchObject({
       title: 'Fix the tap',
-      important: true,
-      avoided: true,
+      priority: true,
+      friction: true,
       areaId: home,
       updatedAt: 2500,
     });
@@ -125,7 +125,7 @@ describe('completing', () => {
     const state = run(
       start,
       addTask('t1', 'Run', health),
-      { type: 'task/update', id: 't1', at: 2500, patch: { important: true } },
+      { type: 'task/update', id: 't1', at: 2500, patch: { priority: true } },
       complete('c1', 't1'),
     );
     expect(openTasks(state)).toEqual([]);
@@ -137,8 +137,8 @@ describe('completing', () => {
         itemId: 't1',
         kind: 'task',
         areaId: health,
-        important: true,
-        avoided: false,
+        priority: true,
+        friction: false,
         warmth: 0,
       }),
     ]);
@@ -168,11 +168,11 @@ describe('completing', () => {
       start,
       addTask('t1', 'Report', work),
       complete('c1', 't1'),
-      { type: 'task/update', id: 't1', at: 4000, patch: { areaId: home, important: true } },
+      { type: 'task/update', id: 't1', at: 4000, patch: { areaId: home, priority: true } },
       { type: 'task/delete', id: 't1', at: 4500 },
       { type: 'area/delete', id: work, at: 5000 },
     );
-    expect(liveCompletions(state)).toEqual([expect.objectContaining({ areaId: work, important: false })]);
+    expect(liveCompletions(state)).toEqual([expect.objectContaining({ areaId: work, priority: false })]);
   });
 
   it('can be undone, and the task can then be completed again', () => {

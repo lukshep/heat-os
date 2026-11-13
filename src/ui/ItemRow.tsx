@@ -53,8 +53,8 @@ export function ItemRow(props: Props) {
   const meta = [
     context,
     item.kind === 'routine' && describeDays(item.days),
-    item.important && 'Important',
-    item.avoided && 'Avoided',
+    item.priority && 'Priority',
+    item.friction && 'Friction',
   ].filter(Boolean);
 
   const className = ['row', arrived && 'is-entering', leaving && 'is-leaving', done && 'is-done']
@@ -126,12 +126,12 @@ function Editor({ item, places, onUpdate, onSetDays, onDelete }: Props) {
         />
       </form>
 
-      <div className="chips" role="group" aria-label="Flags">
-        <Chip pressed={item.important} onClick={() => onUpdate({ important: !item.important })}>
-          Important
+      <div className="chips" role="group" aria-label="Tags">
+        <Chip pressed={item.priority} onClick={() => onUpdate({ priority: !item.priority })}>
+          Priority
         </Chip>
-        <Chip pressed={item.avoided} onClick={() => onUpdate({ avoided: !item.avoided })}>
-          Avoided
+        <Chip pressed={item.friction} onClick={() => onUpdate({ friction: !item.friction })}>
+          Friction
         </Chip>
       </div>
 

@@ -5,8 +5,8 @@ import { DAY_MS, type DayKey } from './day';
 export interface Scorable {
   /** null for an item with no area (the Inbox). */
   areaId: string | null;
-  important: boolean;
-  avoided: boolean;
+  priority: boolean;
+  friction: boolean;
   /** Routine warmth from 0 to 1; 0 for tasks. */
   warmth: number;
 }
@@ -140,18 +140,17 @@ export function warmthFactor(item: Scorable, config: HeatConfig): number {
 }
 
 /**
- * Flat points for the Important and Avoided flags. They are added after everything else,
- * so they are worth the same on the first task of the day and the tenth in an area.
+ * Multiplier from the Priority and Friction tags. Their bonuses add rather than multiply,
+ * so an item with both earns 1 + priority + friction times its untagged reward.
  */
-export function flagPoints(item: Scorable, config: HeatConfig): number {
-  const share = (item.important ? config.importantBonus : 0) + (item.avoided ? config.avoidedBonus : 0);
-  return config.basePoints * share;
+export function tagFactor(item: Scorable, config: HeatConfig): number {
+  return 1 + (item.priority ? config.priorityBonus : 0) + (item.friction ? config.frictionBonus : 0);
 }
 
 /** What a completion is worth before HEAT resistance. */
 export function pointsFor(item: Scorable, position: DayPosition, config: HeatConfig): number {
-  const placed = config.basePoints * areaFactor(item.areaId, position, config) * warmthFactor(item, config);
-  return placed + flagPoints(item, config);
+  const untagged = config.basePoints * areaFactor(item.areaId, position, config) * warmthFactor(item, config);
+  return untagged * tagFactor(item, config);
 }
 
 /**

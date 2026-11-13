@@ -19,10 +19,13 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M8 | Neutral look and icon tab bar | Deployed 2026-11-12 |
 | M9 | Surge: no line, a gauge to 120 | Deployed 2026-11-12 |
 | M10 | Effort, Cooling and a reset | Deployed 2026-11-12; not yet tried on an iPhone |
+| M11 | Priority and Friction | Built 2026-11-12; not yet deployed |
 
 The first prototype is M1–M3.
 
 M9 changed the product: there is no longer a line to reach. Sections M1 to M8 below describe what was built at the time, so they still mention the line, the threshold and its mark. M9 says what replaced them, and `docs/SPEC.md` describes the app as it is now.
+
+M11 renamed the tags. Sections M1 to M10 call Priority and Friction by their old names, Important and Avoided, and describe the flat bonus they used to add.
 
 ### M0 — Scaffold
 
@@ -305,6 +308,22 @@ Open after this pass:
 2. **Switching to Easier for a burst** and back keeps what was earned. The confirmation is the only friction.
 3. **The reset cannot be undone** except by importing a backup.
 
+### M11 — Priority and Friction
+
+Asked for after M10. The two tags are renamed and pay a share of the task's reward instead of a flat bonus.
+
+- **Renamed.** Important is now Priority: what matters most right now. Avoided is now Friction: hard to start, not necessarily hard to do. The names changed everywhere, in the app, the code, the saved data and the simulator.
+- **A share of the reward.** Priority adds 20%, Friction 30%, both 50%. The shares add rather than multiply, and they apply to the task's whole reward, after the area factor and warmth. This replaces the flat 7.5 points each (decision 22).
+- **What that changes.** Tags are now much smaller, and they shrink with the area's diminishing returns like everything else. A first task in a fresh area always beats a tagged repeat, and a tagged task done first in its area earns more than one done later. Tagging every task of a balanced day peaks at 96 instead of 108, so tags alone no longer reach Surge. A huge day still does, for 27% of the time instead of 43%.
+- **Unchanged.** Each tag is still an optional, independent toggle on a task or routine, and the editor's two chips work as before.
+- **The bonus is on points,** so the HEAT a tag adds is a shade under its share near the top of the gauge, where gains taper: about 19% for Priority at HEAT 70 rather than 20%.
+
+Saved data: the format is now version 5, which renames `important` and `avoided` to `priority` and `friction` on every task, routine and completion. Version 4 documents are upgraded on load.
+
+Current HEAT moves when this lands. HEAT is replayed from the log, so completions tagged before this change are rescored under the new rule, and anyone who used the tags will see HEAT drop a little. Nothing is lost; the tags themselves are kept.
+
+Verified: unit tests for the tag multiplier and the version 4 upgrade; scenario invariants rewritten on purpose for the new rule (20%, 30% and 50% wherever the task falls; a fresh area beats a tagged repeat; tags alone stay out of Surge) and the calibration snapshot updated. On a production build in a desktop browser at phone size, with made-up data: a task tagged Avoided in the old build arriving as Friction, with Priority off, on Today and in the editor; the document saved as version 5 at the next change, with no old names left; and completing it adding the Friction share. Not verified on an iPhone.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications.
@@ -334,13 +353,15 @@ Cloud sync, routine pause, notifications.
 | 19 | There is no line to reach and no daily success or failure. HEAT is a gauge of recent activity and consistency | Decided 2026-11-12 |
 | 20 | HEAT can pass 100 into Surge, up to 120. A full gauge is difficult and uncommon | Decided 2026-11-12; the cap of 120 is a proposal to revisit |
 | 21 | Surge cools more slowly than the rest of the gauge, so the overflow is a buffer | Decided 2026-11-12, chosen from the options in the M9 plan |
-| 22 | Important and Avoided add a flat bonus that nothing diminishes | Decided 2026-11-12 |
+| 22 | Important and Avoided add a flat bonus that nothing diminishes | Replaced by 29 |
 | 23 | Consistent, balanced activity should sit at about 70 to 85 | Decided 2026-11-12; "balanced" is assumed to be two tasks in each of four areas. Holds at Standard Effort and Cooling (25) |
 | 24 | Surge is shown only by the line itself. It is not named in the app and nothing is recorded | Assumed at M9 |
 | 25 | A person can set Effort and Cooling, three named steps each, and each change asks for confirmation | Decided 2026-11-12 |
 | 26 | Effort and Cooling apply from the moment they change; HEAT already earned is never rescored | Decided 2026-11-12 |
 | 27 | Cooling changes only how fast HEAT fades, so it also moves where the same days sit | Decided 2026-11-12, chosen over holding the band fixed |
 | 28 | HEAT can be reset by hand from Settings, after a confirmation. The completion log is kept | Decided 2026-11-12 |
+| 29 | Priority adds 20% of a task's reward, Friction 30%, both 50%. The shares add, never multiply | Decided 2026-11-12 |
+| 30 | Important is renamed Priority and Avoided is renamed Friction, in the app, the code and the saved data | Decided 2026-11-12 |
 
 ## Tuning log
 
@@ -362,3 +383,4 @@ Record every change to `DEFAULT_CONFIG` here: date, what changed, why, and which
 | 2026-11-12 | Flags: flat 0.75 of the base each (7.5 points), added after the area factor. Was a multiplier of 0.5 each that halved with every flagged completion; the halving rule is removed | Important and Avoided should be worth substantially more wherever they fall, with no diminishing returns. "Flag everything" now reaches Surge, which is accepted for now |
 | 2026-11-12 | Warmth now multiplies only the area part of a routine's points, not its flags | Follows from flags being flat |
 | 2026-11-12 | New: Effort steps scale the gain scale by 0.75, 1 and 1.3. Cooling steps shift daily retention by +0.05, 0 and -0.05; Surge retention never drops below the daily rate. `DEFAULT_CONFIG` unchanged | Personal settings (M10). The Effort steps put a light day (Easier) and a heavy day (Harder) where a balanced day sits on Standard. Shifting Surge retention too made Surge permanent for a huge day on Slower |
+| 2026-11-12 | Tags: `importantBonus` and `avoidedBonus` (0.75 each, flat, as a share of a plain task) become `priorityBonus` 0.2 and `frictionBonus` 0.3, as a share of the item's own reward. They add, and multiply the area factor and warmth | Asked for (M11). A balanced day with its first task tagged with both goes from 100 points (peak 90) to 92 (peak 87); a huge day from 194 (peak 107, 43% in Surge) to 175 (peak 104, 27%); tagging everything from 205 (peak 108, 47%) to 127 (peak 96, none) |
