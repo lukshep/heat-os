@@ -18,7 +18,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M7 | Edge meter | Deployed 2026-11-12; tried on an iPhone, corners judged good |
 | M8 | Neutral look and icon tab bar | Deployed 2026-11-12 |
 | M9 | Surge: no line, a gauge to 120 | Deployed 2026-11-12 |
-| M10 | Effort, Cooling and a reset | Built 2026-11-12; not yet deployed |
+| M10 | Effort, Cooling and a reset | Deployed 2026-11-12; not yet tried on an iPhone |
 
 The first prototype is M1–M3.
 
