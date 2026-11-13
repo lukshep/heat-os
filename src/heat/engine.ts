@@ -50,6 +50,50 @@ export interface HeatTrace {
   scored: ScoredCompletion[];
 }
 
+/** A config and the moment it took effect. */
+export interface ConfigPeriod {
+  from: number;
+  config: HeatConfig;
+}
+
+/**
+ * Every config HEAT has been scored under, oldest first. The first covers all time before
+ * the second, whatever its `from`. A change of settings applies from the moment it was made,
+ * so it never rewrites HEAT already earned.
+ */
+export type ConfigTimeline = readonly [ConfigPeriod, ...ConfigPeriod[]];
+
+/** What the fold accepts: one config for all time, or a timeline of them. */
+export type ConfigHistory = HeatConfig | ConfigTimeline;
+
+function timelineOf(history: ConfigHistory): ConfigTimeline {
+  return Array.isArray(history)
+    ? (history as ConfigTimeline)
+    : [{ from: Number.NEGATIVE_INFINITY, config: history as HeatConfig }];
+}
+
+/** The config in force at `time`: the last period to begin at or before it. */
+export function configAt(timeline: ConfigTimeline, time: number): HeatConfig {
+  let current = timeline[0].config;
+  for (const period of timeline) {
+    if (period.from <= time) current = period.config;
+  }
+  return current;
+}
+
+/** HEAT after cooling from `from` to `to`, at the rate in force over each stretch. */
+export function coolBetween(heat: number, from: number, to: number, timeline: ConfigTimeline): number {
+  let level = heat;
+  let start = from;
+  timeline.forEach((period, index) => {
+    const end = Math.min(to, timeline[index + 1]?.from ?? Number.POSITIVE_INFINITY);
+    if (end <= start) return;
+    level = cool(level, end - start, period.config);
+    start = end;
+  });
+  return level;
+}
+
 const UNASSIGNED = '';
 
 /** The key under which an area's daily completions are counted. */
@@ -144,13 +188,15 @@ function countable(completions: readonly CompletionFact[]): CompletionFact[] {
 
 /**
  * Replays the completion log and reports HEAT at each of `sampleTimes`, which must be ascending.
- * Completions later than the last sample time are not applied.
+ * Completions later than the last sample time are not applied. Each completion is scored, and
+ * each stretch cooled, with the config in force at the time.
  */
 export function traceHeat(
   completions: readonly CompletionFact[],
-  config: HeatConfig,
+  history: ConfigHistory,
   sampleTimes: readonly number[],
 ): HeatTrace {
+  const timeline = timelineOf(history);
   const events = countable(completions);
   const days = new Map<DayKey, Record<string, number>>();
   const scored: ScoredCompletion[] = [];
@@ -171,7 +217,8 @@ export function traceHeat(
         days.set(event.dayKey, areaCounts);
       }
 
-      const before = cool(heat, event.at - heatAt, config);
+      const config = configAt(timeline, event.at);
+      const before = coolBetween(heat, heatAt, event.at, timeline);
       const points = pointsFor(event, positionOf(areaCounts, event), config);
       heat = applyGain(before, points, config);
       heatAt = event.at;
@@ -181,7 +228,7 @@ export function traceHeat(
       areaCounts[bucket] = (areaCounts[bucket] ?? 0) + 1;
     }
 
-    samples.push(cool(heat, time - heatAt, config));
+    samples.push(coolBetween(heat, heatAt, time, timeline));
   }
 
   return { samples, scored };
@@ -190,11 +237,11 @@ export function traceHeat(
 /** HEAT right now, plus what is needed to price the next completion. */
 export function foldHeat(
   completions: readonly CompletionFact[],
-  config: HeatConfig,
+  history: ConfigHistory,
   now: number,
   today: DayKey,
 ): HeatState {
-  const { samples, scored } = traceHeat(completions, config, [now]);
+  const { samples, scored } = traceHeat(completions, history, [now]);
   const areaCounts: Record<string, number> = {};
   for (const { fact } of scored) {
     if (fact.dayKey !== today) continue;

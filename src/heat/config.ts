@@ -58,3 +58,44 @@ export const FULL_HEAT = 100;
 
 /** The ceiling gains approach but never reach. Surge is the stretch between FULL_HEAT and here. */
 export const MAX_HEAT = 120;
+
+/** How much a day's work warms HEAT, a person's own setting. In order, least work first. */
+export const EFFORTS = ['easier', 'standard', 'harder'] as const;
+export type Effort = (typeof EFFORTS)[number];
+
+/** How fast HEAT cools, a person's own setting. In order, slowest first. */
+export const COOLINGS = ['slower', 'standard', 'faster'] as const;
+export type Cooling = (typeof COOLINGS)[number];
+
+/** The two parts of HEAT a person can choose, each as a named step. */
+export interface Tuning {
+  effort: Effort;
+  cooling: Cooling;
+}
+
+export const STANDARD_TUNING: Tuning = { effort: 'standard', cooling: 'standard' };
+
+/**
+ * Each Effort step as a share of the gain scale; a smaller scale makes every point warm
+ * HEAT more. On Easier a light day (two tasks in each of three areas) sits where a balanced
+ * day does on Standard. On Harder it takes three tasks in each of four areas.
+ */
+export const EFFORT_SCALE: Record<Effort, number> = { easier: 0.75, standard: 1, harder: 1.3 };
+
+/**
+ * Each Cooling step as a change to the daily retention. Points are untouched, so Slower
+ * cooling also lets the same days sit higher. Surge keeps its own rate but never cools
+ * faster than the rest of the gauge; moving it too would make Surge last all day on Slower.
+ */
+export const COOLING_SHIFT: Record<Cooling, number> = { slower: 0.05, standard: 0, faster: -0.05 };
+
+/** A config with a person's Effort and Cooling applied. Standard for both changes nothing. */
+export function tuned(config: HeatConfig, tuning: Tuning): HeatConfig {
+  const shift = COOLING_SHIFT[tuning.cooling];
+  return {
+    ...config,
+    gainScale: config.gainScale * EFFORT_SCALE[tuning.effort],
+    dailyRetention: config.dailyRetention + shift,
+    surgeRetention: Math.max(config.surgeRetention, config.dailyRetention + shift),
+  };
+}

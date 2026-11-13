@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG as config, FULL_HEAT, MAX_HEAT } from './config';
+import {
+  DEFAULT_CONFIG as config,
+  FULL_HEAT,
+  MAX_HEAT,
+  COOLINGS,
+  EFFORTS,
+  STANDARD_TUNING,
+  tuned,
+  type Tuning,
+} from './config';
 import { DAY_MS, HOUR_MS } from './day';
 import { applyGain, cool, gainFor, pointsFor, type HeatState, type Scorable } from './engine';
 import { SCENARIOS, simulate, type Scenario } from './sim';
@@ -228,4 +237,51 @@ describe('presets', () => {
     expect(stats.surgeShare).toBeGreaterThanOrEqual(0);
     expect(stats.surgeShare).toBeLessThanOrEqual(1);
   });
+});
+
+/**
+ * A person's own Effort and Cooling. Effort moves what counts as a normal day; Cooling
+ * changes only how fast HEAT fades, so it also moves where the same days sit.
+ */
+describe('Effort and Cooling', () => {
+  const HEAVY = daily({ areas: 4, tasks: 12 });
+  const EVERY_TUNING = EFFORTS.flatMap((effort) => COOLINGS.map((cooling): Tuning => ({ effort, cooling })));
+
+  const on = (tuning: Partial<Tuning>) => tuned(config, { ...STANDARD_TUNING, ...tuning });
+  const settledOn = (scenario: Scenario, tuning: Partial<Tuning>) => simulate(scenario, on(tuning), SETTLED).stats;
+
+  /** Within a couple of points: the steps are round numbers, not solved exactly. */
+  const sitsWith = (actual: number, expected: number) => expect(Math.abs(actual - expected)).toBeLessThan(2);
+
+  it('on Easier, holds a light day where a balanced day sits on Standard', () => {
+    sitsWith(settledOn(LIGHT, { effort: 'easier' }).settledPeak, settled(BALANCED).settledPeak);
+    sitsWith(settledOn(LIGHT, { effort: 'easier' }).settledLow, settled(BALANCED).settledLow);
+  });
+
+  it('on Harder, takes three tasks in each of four areas to sit there', () => {
+    sitsWith(settledOn(HEAVY, { effort: 'harder' }).settledPeak, settled(BALANCED).settledPeak);
+    sitsWith(settledOn(HEAVY, { effort: 'harder' }).settledLow, settled(BALANCED).settledLow);
+  });
+
+  it('with Slower cooling, makes a day off cost less and lets the same days sit higher', () => {
+    const standard = settled(BALANCED);
+    const slower = settledOn(BALANCED, { cooling: 'slower' });
+    expect(slower.settledPeak).toBeGreaterThan(standard.settledPeak + 3);
+    expect(slower.settledPeak - slower.settledLow).toBeLessThan(standard.settledPeak - standard.settledLow);
+  });
+
+  it('with Faster cooling, does the opposite', () => {
+    const standard = settled(BALANCED);
+    const faster = settledOn(BALANCED, { cooling: 'faster' });
+    expect(faster.settledPeak).toBeLessThan(standard.settledPeak - 3);
+    expect(faster.settledPeak - faster.settledLow).toBeGreaterThan(standard.settledPeak - standard.settledLow);
+  });
+
+  it.each(EVERY_TUNING.map((tuning) => [`${tuning.effort}, ${tuning.cooling}`, tuning] as const))(
+    'on %s, never lets a balanced day fill the gauge or a huge day surge for good',
+    (_name, tuning) => {
+      expect(settledOn(BALANCED, tuning).surgeShare).toBe(0);
+      expect(settledOn(HUGE, tuning).settledLow).toBeLessThan(FULL_HEAT);
+    },
+  );
 });

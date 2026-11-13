@@ -17,7 +17,8 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M6 | Polish | Deployed 2026-11-12; not yet tried on an iPhone |
 | M7 | Edge meter | Deployed 2026-11-12; tried on an iPhone, corners judged good |
 | M8 | Neutral look and icon tab bar | Deployed 2026-11-12 |
-| M9 | Surge: no line, a gauge to 120 | Built 2026-11-12; not yet deployed |
+| M9 | Surge: no line, a gauge to 120 | Deployed 2026-11-12 |
+| M10 | Effort, Cooling and a reset | Built 2026-11-12; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -209,6 +210,8 @@ Known weaknesses, to judge on the phone:
 
 Verified on a production build in a desktop browser at phone size: the line growing with each completion, the flare on a gain, the mark moving with the setting and answering when reached. Not verified on an iPhone, which is where every weakness above shows.
 
+Later fix: on the iPhone the line had no glow. Safari ignores CSS filters on shapes inside an SVG, so the glow, the tip's halo, the flare and the Surge band are now SVG filters.
+
 ### M8 — Neutral look and icon tab bar
 
 Asked for after seeing the edge meter on the phone.
@@ -281,6 +284,27 @@ Open after this pass:
 3. **Is two tasks in each of four areas the right "balanced day"?** The gain scale is the dial.
 4. **Does the edge still read without a mark?** Colour now carries the level alone.
 
+### M10 — Effort, Cooling and a reset
+
+Asked for after M9: settings a person can tune, each behind a confirmation, and a way to reset HEAT.
+
+- **Effort** (Easier, Standard, Harder) sets how much a day's work warms HEAT. It scales the gain scale by 0.75, 1 or 1.3. On Easier a light day sits where a balanced day does on Standard; on Harder it takes three tasks in each of four areas.
+- **Cooling** (Slower, Standard, Faster) sets how fast HEAT fades: 15%, 20% or 25% a day. Points are untouched, so Slower also lets the same days sit higher. The first plan paired each Cooling step with a gain-scale change that held a balanced day at 85, but that made slower cooling feel like harder work, so Cooling now does only what its name says.
+- **Surge keeps its own rate** but never cools faster than the rest of the gauge. Moving it with the daily rate made Surge last all day on Slower, which breaks the rule that Surge is a buffer and not a state to hold.
+- **Changes apply from the moment they are made.** Each is saved with its time, and the fold replays the log against a timeline of configs (`heatTimeline`), cooling each stretch and scoring each completion with the config in force then. HEAT already earned never moves, and undo still works.
+- **Reset HEAT** saves its time (`heatResetAt`), and HEAT counts only completions after it. The log is kept, so what was done stays done.
+- **Confirmation** is the system dialog, as for restoring a backup. Cancelling leaves the picker where it was. The steps have names, never numbers.
+
+Saved data: the format is now version 4, which adds the dated Effort and Cooling changes and the reset time. Version 3 documents are upgraded to Standard with no reset.
+
+Verified: unit tests for the timeline, the steps, the reset and the version 3 upgrade, and scenario invariants for all nine combinations of Effort and Cooling. On a production build in a desktop browser at phone size, with made-up data: version 3 data loading and being saved as version 4; each picker cancelled and then accepted; HEAT unchanged by a change; the reset taking HEAT to cold and keeping completed tasks done; everything surviving a reload; and a completion after the reset warming at the Easier rate. The confirmation dialog was stubbed for the browser test, so the real dialog has not been seen. Not verified on an iPhone.
+
+Open after this pass:
+
+1. **Easier and Slower together** put a balanced day at 99, just short of full. Accepted, since both were chosen.
+2. **Switching to Easier for a burst** and back keeps what was earned. The confirmation is the only friction.
+3. **The reset cannot be undone** except by importing a backup.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications.
@@ -311,8 +335,12 @@ Cloud sync, routine pause, notifications.
 | 20 | HEAT can pass 100 into Surge, up to 120. A full gauge is difficult and uncommon | Decided 2026-11-12; the cap of 120 is a proposal to revisit |
 | 21 | Surge cools more slowly than the rest of the gauge, so the overflow is a buffer | Decided 2026-11-12, chosen from the options in the M9 plan |
 | 22 | Important and Avoided add a flat bonus that nothing diminishes | Decided 2026-11-12 |
-| 23 | Consistent, balanced activity should sit at about 70 to 85 | Decided 2026-11-12; "balanced" is assumed to be two tasks in each of four areas |
+| 23 | Consistent, balanced activity should sit at about 70 to 85 | Decided 2026-11-12; "balanced" is assumed to be two tasks in each of four areas. Holds at Standard Effort and Cooling (25) |
 | 24 | Surge is shown only by the line itself. It is not named in the app and nothing is recorded | Assumed at M9 |
+| 25 | A person can set Effort and Cooling, three named steps each, and each change asks for confirmation | Decided 2026-11-12 |
+| 26 | Effort and Cooling apply from the moment they change; HEAT already earned is never rescored | Decided 2026-11-12 |
+| 27 | Cooling changes only how fast HEAT fades, so it also moves where the same days sit | Decided 2026-11-12, chosen over holding the band fixed |
+| 28 | HEAT can be reset by hand from Settings, after a confirmation. The completion log is kept | Decided 2026-11-12 |
 
 ## Tuning log
 
@@ -333,3 +361,4 @@ Record every change to `DEFAULT_CONFIG` here: date, what changed, why, and which
 | 2026-11-12 | Gain scale 300 to 215 | With gains aimed at 120, this puts a balanced day (85 points) at a peak of 85 and a low of 68, and a full gauge about 206 points away |
 | 2026-11-12 | Flags: flat 0.75 of the base each (7.5 points), added after the area factor. Was a multiplier of 0.5 each that halved with every flagged completion; the halving rule is removed | Important and Avoided should be worth substantially more wherever they fall, with no diminishing returns. "Flag everything" now reaches Surge, which is accepted for now |
 | 2026-11-12 | Warmth now multiplies only the area part of a routine's points, not its flags | Follows from flags being flat |
+| 2026-11-12 | New: Effort steps scale the gain scale by 0.75, 1 and 1.3. Cooling steps shift daily retention by +0.05, 0 and -0.05; Surge retention never drops below the daily rate. `DEFAULT_CONFIG` unchanged | Personal settings (M10). The Effort steps put a light day (Easier) and a heavy day (Harder) where a balanced day sits on Standard. Shifting Surge retention too made Surge permanent for a huge day on Slower |

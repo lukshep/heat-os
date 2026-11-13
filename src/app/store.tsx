@@ -1,5 +1,6 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
 import type { AppState, ID, Settings } from '../data/model';
+import type { Tuning } from '../heat/config';
 import { reduce, type Action, type ItemPatch } from '../data/reducer';
 import { heatConfig, routineDays, routineWarmth, type ListItem } from '../data/selectors';
 import type { StorageAdapter } from '../data/storage';
@@ -59,7 +60,11 @@ export interface Actions {
   /** Sets a task aside from Today's suggestions for the rest of the day. */
   deferToday(taskId: ID): void;
   /** Moves the start of the day. */
-  updateSettings(patch: Partial<Settings>): void;
+  updateSettings(patch: Partial<Pick<Settings, 'dayStartHour'>>): void;
+  /** Sets Effort and Cooling from now on. */
+  tune(tuning: Tuning): void;
+  /** Starts HEAT again from cold. Tasks, routines and the completion log are kept. */
+  resetHeat(): void;
   replaceState(state: AppState): void;
 }
 
@@ -138,6 +143,8 @@ export function createActions(store: AppStore): Actions {
       // The day may have just changed under a new start hour, so let every screen look again.
       clock.touch();
     },
+    tune: (tuning) => store.dispatch({ type: 'settings/tune', at: clock.touch(), tuning }),
+    resetHeat: () => store.dispatch({ type: 'heat/reset', at: clock.touch() }),
     replaceState: (state) => store.dispatch({ type: 'state/replace', state }),
   };
 }

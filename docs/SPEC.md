@@ -29,7 +29,7 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 **Routines** are tasks that repeat. Giving a filed task one or more weekdays makes it a routine; clearing them makes it a one-off task again. A routine must live in an area. On Today it appears on its scheduled days until it is done. In its area it is always listed, shown as done for the rest of the day once completed, and can be completed on an unscheduled day too.
 
-**Settings** holds the hour a new day starts, and the backup.
+**Settings** holds the hour a new day starts, Effort and Cooling, the backup, and a way to reset HEAT. Effort, Cooling and the reset each ask for confirmation first, and their steps have names, never numbers.
 
 Tasks can be completed from any section. HEAT is shown on every screen, so every completion gives feedback wherever it happens.
 
@@ -73,7 +73,11 @@ interface AppState {
   tasks: Record<ID, Task>; routines: Record<ID, Routine>;
   completions: Record<ID, Completion>;
   deferred: { dayKey: DayKey; taskIds: ID[] };   // set aside from Today; local to the device
-  settings: { dayStartHour: number };
+  settings: {
+    dayStartHour: number;
+    tuning: { at: number; effort: 'easier' | 'standard' | 'harder'; cooling: 'slower' | 'standard' | 'faster' }[];
+  };
+  heatResetAt: number | null;                    // when HEAT was last reset to cold
 }
 ```
 
@@ -85,14 +89,16 @@ interface AppState {
 - Routine warmth is derived by walking scheduled days after `warmthBase.asOf` against the days the routine was completed. Editing a schedule re-snapshots the base so history is not reinterpreted.
 - A routine keeps the id of the task it was made from, and a task made from a routine keeps the routine's id. The record it left behind is soft-deleted, so an id is live in at most one of the two collections.
 - A routine counts once per day. Its completion records the warmth it had at that moment and whether the day was scheduled.
-- `settings` holds the one part of the HEAT config a person can change: the hour a new day starts (midnight to 8 am). Everything else in the config is fixed by the build. A new day start applies from then on.
-- The saved format is at version 3. Version 1, from before settings existed, and version 2, which also held the position of the line that used to be reached each day, are upgraded on load. The upgraded shape is written at the next change.
+- `settings` holds the parts of the HEAT config a person can change: the hour a new day starts (midnight to 8 am), and Effort and Cooling. Everything else in the config is fixed by the build. A new day start applies from then on.
+- `settings.tuning` is every change of Effort and Cooling, oldest first, each with the moment it was made. Before the first both were Standard, and the last is in force now. The log is kept rather than just the current values because HEAT is replayed with whichever settings were in force at each moment.
+- `heatResetAt` is when HEAT was last reset. HEAT counts only completions after it. The completion log itself is untouched, so what was done stays done.
+- The saved format is at version 4. Version 1, from before settings existed, version 2, which also held the position of the line that used to be reached each day, and version 3, from before Effort, Cooling and the reset, are upgraded on load. The upgraded shape is written at the next change.
 - `deferred` holds the tasks swapped out of Today's suggestions. It only counts on the day it was made and is not meant to sync.
 - Sync readiness consists of stable IDs, `updatedAt`, soft-delete tombstones, an append-only log, and a fold that ignores duplicates (one completion per task; one per routine per day).
 
 ## HEAT model
 
-HEAT is never stored. It is computed by replaying the completion log up to the present. All numbers below are the current values in `HeatConfig` and are expected to change through tuning.
+HEAT is never stored. It is computed by replaying the completion log, from the last reset up to the present. All numbers below are the current values in `HeatConfig`, at Standard Effort and Cooling, and are expected to change through tuning.
 
 The gauge is full at 100 (`FULL_HEAT`) and stops at 120 (`MAX_HEAT`). The stretch between them is Surge.
 
@@ -164,6 +170,28 @@ The same pattern every day, completed in one sitting. HEAT swings between a dail
 - **Recovery.** From zero the first task adds about 8. Balanced days peak at 39, 60, 72, 78 and 81.
 - **Stored momentum.** From 110, HEAT is still in Surge twelve hours later and at 91 a day later. At the ordinary rate it would be 98 and 88.
 
+### Effort and Cooling
+
+Two settings a person can change, each with three named steps. Standard is the model above.
+
+- **Effort** sets how much a day's work warms HEAT, by scaling the gain scale: 0.75 on Easier, 1 on Standard, 1.3 on Harder. On Easier a light day (two tasks in each of three areas) sits where a balanced day does on Standard. On Harder it takes three tasks in each of four areas.
+- **Cooling** sets how fast HEAT fades: 15% a day on Slower, 20% on Standard, 25% on Faster. It does not touch points, so slower cooling also lets the same days sit higher. Surge keeps its own rate of 15% a day, but never cools faster than the rest of the gauge, so on Slower the two rates are the same.
+- **A change applies from the moment it is made.** Each completion is scored, and each stretch of time cooled, with the settings in force at the time. HEAT already earned does not move when a setting changes.
+
+A balanced day (two tasks in each of four areas), every day, peaks and lows:
+
+| Effort | Slower | Standard | Faster |
+|---|---|---|---|
+| Easier | 99 / 84 | 93 / 74 | 88 / 66 |
+| Standard | 92 / 78 | 85 / 68 | 79 / 59 |
+| Harder | 84 / 72 | 77 / 61 | 70 / 53 |
+
+On every combination a balanced day stays out of Surge, and a huge day kept up every day drops back below 100 before the next day's work.
+
+### Reset
+
+Settings can reset HEAT to cold. The time is saved, and HEAT counts only completions after it. Nothing is deleted: tasks and routines are untouched, and anything completed before the reset stays done. Completions earlier in the same day no longer count toward that day's diminishing returns. There is no undo short of importing a backup.
+
 ### Routine warmth
 
 Warmth is a hidden value from 0 to 1 per routine. The area part of a fully warm routine is worth twice a plain task's.
@@ -205,6 +233,8 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 | Warm routines carry a lot | Three warm routines and three tasks settle at 87, above a balanced day of eight tasks | Intended reward for consistency; the full-warmth bonus is the lever |
 | Time off resets routines | Three missed days in a row leave a routine cold | Intended. A routine pause is a later feature |
 | Cadence asymmetry | A daily routine warms in a week, a weekly one in two months | Observe; the step could scale with cadence |
-| Retroactive retuning | Changing config rewrites current HEAT, because it is derived. The Surge change raises everyone's current HEAT when it lands | Wanted in the simulator; config is fixed in production builds |
+| Retroactive retuning | Changing the defaults in a new build rewrites current HEAT, because it is derived. The Surge change raised everyone's current HEAT when it landed | Wanted in the simulator. A person's own Effort and Cooling apply from the moment they change, so they never rewrite it |
+| Settings as a lever | Switching to Easier for a burst of work and back again keeps what was earned under Easier | Accepted for a personal app. The confirmation is the friction |
+| Stacked settings | Easier and Slower together put a balanced day at 99, just short of a full gauge | Accepted: both were chosen. The scenario tests keep a balanced day out of Surge on every combination |
 
 One ordering effect is intended: completing the warm item first in an area earns more than completing a plain one first. Flags have no ordering effect, since they are paid in full wherever they fall.

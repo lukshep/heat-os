@@ -1,4 +1,5 @@
-import { DEFAULT_SETTINGS, normalizeSettings, SCHEMA_VERSION, type AppState } from './model';
+import { COOLINGS, EFFORTS } from '../heat/config';
+import { DEFAULT_SETTINGS, normalizeSettings, SCHEMA_VERSION, type AppState, type TuningChange } from './model';
 
 /** Where the state document is kept. Swappable so tests, and later sync, need no browser. */
 export interface StorageAdapter {
@@ -134,6 +135,12 @@ function migrate(raw: Dict): Dict | null {
     document = { ...document, schemaVersion: 3, settings };
   }
 
+  // Version 4 added Effort and Cooling, which were Standard until now, and the HEAT reset.
+  if (document.schemaVersion === 3) {
+    const settings = isDict(document.settings) ? { ...document.settings, tuning: [] } : document.settings;
+    document = { ...document, schemaVersion: 4, settings, heatResetAt: null };
+  }
+
   return document.schemaVersion === SCHEMA_VERSION ? document : null;
 }
 
@@ -156,9 +163,21 @@ export function parseState(raw: unknown): AppState | null {
 
   const settings = current.settings;
   if (!isDict(settings) || !isNumber(settings.dayStartHour)) return null;
+  if (!Array.isArray(settings.tuning) || !settings.tuning.every(isTuningChange)) return null;
+  if (!isNumberOrNull(current.heatResetAt)) return null;
 
   // A hand-edited backup could ask for a day that starts at an impossible hour; pull it back in.
-  return { ...current, settings: normalizeSettings(settings) } as unknown as AppState;
+  const normalized = normalizeSettings({ dayStartHour: settings.dayStartHour, tuning: settings.tuning });
+  return { ...current, settings: normalized } as unknown as AppState;
+}
+
+function isTuningChange(value: unknown): value is TuningChange {
+  return (
+    isDict(value) &&
+    isNumber(value.at) &&
+    (EFFORTS as readonly unknown[]).includes(value.effort) &&
+    (COOLINGS as readonly unknown[]).includes(value.cooling)
+  );
 }
 
 /** The backup file's contents. */

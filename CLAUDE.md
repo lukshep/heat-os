@@ -13,7 +13,8 @@ These are requirements. Do not add features that break them, even as small helpe
 
 - HEAT is the only progress meter. It is the line of light round the edge of the screen (`src/ui/EdgeMeter.tsx`), present on every screen. No percentages, XP, currencies, achievements, badges or dashboards.
 - Never display streak counts, routine warmth or routine progress. Warmth is felt only through colour.
-- No daily completion state and no daily pass or fail: no "all done", no threshold or goal line, no midnight reset of HEAT. The edge meter is the only signal.
+- No daily completion state and no daily pass or fail: no "all done", no threshold or goal line, no midnight reset of HEAT. The edge meter is the only signal. HEAT resets only when the person asks, from Settings.
+- Settings that change how HEAT behaves (Effort, Cooling, the reset) ask for confirmation before they act, and their steps have names, never numbers.
 - Surge (HEAT above 100) is shown only by the edge line itself. Do not name it in the product UI, record it, count it or reward it.
 - No "areas touched today" indicator, or anything else that turns the day into a checklist.
 - Temperature colour is the main feedback. Numbers stay out of the product UI; the dev screen may show them.
@@ -64,8 +65,8 @@ Import rules:
 
 ## Invariants
 
-- **HEAT is derived, never stored.** The completion log is the single source of truth; `foldHeat` replays it. Undo removes a completion; nothing else needs repair.
-- **Every tunable number lives in `HeatConfig`** (`src/heat/config.ts`). No magic numbers in the engine or UI. The gauge's two fixed points sit beside it as constants: `FULL_HEAT` (100, one full loop of the edge) and `MAX_HEAT` (120, the ceiling of Surge).
+- **HEAT is derived, never stored.** The completion log is the single source of truth; `foldHeat` replays it from the last reset (`heatCompletions`). Undo removes a completion; nothing else needs repair. A reset stores only its time, never a HEAT value.
+- **Every tunable number lives in `HeatConfig`** (`src/heat/config.ts`). No magic numbers in the engine or UI. Beside it as constants: the gauge's two fixed points, `FULL_HEAT` (100, one full loop of the edge) and `MAX_HEAT` (120, the ceiling of Surge), and the Effort and Cooling steps.
 - **Important and Avoided are flat bonuses**, added after the area factor and warmth. Nothing diminishes them.
 - **Completions are immutable facts** (when, which item, area, flags, warmth, day), never scores. Editing or deleting an item later must not rewrite past HEAT.
 - **"Done" is derived** from the completion log. Tasks have no `completedAt`; a routine is done today if the log holds a completion for today.
@@ -75,7 +76,7 @@ Import rules:
 - **View preferences are not data.** Which sections are folded lives in localStorage (`src/app/collapsed.ts`), outside the state document and its backups.
 - **All records carry** `id`, `createdAt`, `updatedAt`, `deletedAt`. Delete by setting `deletedAt`.
 - **Changing the persisted shape** means bumping `SCHEMA_VERSION`, adding a step to `migrate` in `src/data/storage.ts`, and testing that step against a document of the old shape. People have data saved by earlier builds.
-- **The config in force** is `heatConfig(state.settings)`: the tuned defaults with the person's own day start. Never read `DEFAULT_CONFIG` in `app/` or `screens/`.
+- **The config in force** is `heatConfig(state.settings)`: the tuned defaults with the person's own day start, Effort and Cooling. HEAT itself is folded over `heatTimeline(state.settings)`, so a change of Effort or Cooling applies from the moment it is made and never rescores the past. Never read `DEFAULT_CONFIG` in `app/` or `screens/`.
 - **Engine changes need a test.** Unit tests use the round numbers in `src/heat/testConfig.ts`, never `DEFAULT_CONFIG`, so they do not move when the defaults are retuned.
 - **Retuning has a paper trail.** A change to `DEFAULT_CONFIG` must keep `scenarios.test.ts` passing, or change an invariant there on purpose. Either way, update the expected-behaviour table in `docs/SPEC.md` and add a line to the tuning log in `docs/PLAN.md`.
 

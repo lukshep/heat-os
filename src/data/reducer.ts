@@ -1,6 +1,8 @@
+import type { Tuning } from '../heat/config';
 import type { DayKey } from '../heat/day';
 import type { WarmthBase } from '../heat/warmth';
 import {
+  currentTuning,
   normalizeSettings,
   type AppState,
   type Area,
@@ -58,7 +60,11 @@ export type Action =
   | { type: 'project/delete'; id: ID; at: number }
   | { type: 'today/defer'; dayKey: DayKey; taskId: ID }
   /** Changes when the day starts. The value is kept on a step and inside its limits. */
-  | { type: 'settings/update'; patch: Partial<Settings> }
+  | { type: 'settings/update'; patch: Partial<Pick<Settings, 'dayStartHour'>> }
+  /** Sets Effort and Cooling from this moment on. HEAT already earned is not rescored. */
+  | { type: 'settings/tune'; at: number; tuning: Tuning }
+  /** Starts HEAT again from cold. The completion log is kept; only what comes after counts. */
+  | { type: 'heat/reset'; at: number }
   | { type: 'state/replace'; state: AppState };
 
 function isLive<T extends { deletedAt: number | null }>(record: T | undefined): record is T {
@@ -407,6 +413,17 @@ export function reduce(state: AppState, action: Action): AppState {
       const settings = normalizeSettings({ ...state.settings, ...action.patch });
       return settings.dayStartHour === state.settings.dayStartHour ? state : { ...state, settings };
     }
+
+    case 'settings/tune': {
+      const { effort, cooling } = action.tuning;
+      const now = currentTuning(state.settings);
+      if (effort === now.effort && cooling === now.cooling) return state;
+      const tuning = [...state.settings.tuning, { at: action.at, effort, cooling }];
+      return { ...state, settings: normalizeSettings({ ...state.settings, tuning }) };
+    }
+
+    case 'heat/reset':
+      return { ...state, heatResetAt: action.at };
 
     case 'state/replace':
       return action.state;

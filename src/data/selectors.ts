@@ -1,13 +1,39 @@
-import { DEFAULT_CONFIG, type HeatConfig } from '../heat/config';
+import { DEFAULT_CONFIG, STANDARD_TUNING, tuned, type HeatConfig } from '../heat/config';
 import type { DayKey } from '../heat/day';
-import type { Scorable } from '../heat/engine';
+import type { ConfigTimeline, Scorable } from '../heat/engine';
 import type { Candidate } from '../heat/suggest';
 import { isScheduledOn, warmthAt, type WarmthState } from '../heat/warmth';
-import type { AppState, Area, Completion, ID, Routine, Settings, Task } from './model';
+import { currentTuning, type AppState, type Area, type Completion, type ID, type Routine, type Settings, type Task } from './model';
 
-/** The HEAT config in force: the tuned defaults, with the person's own day start. */
-export function heatConfig(settings: Settings): HeatConfig {
+/** The tuned defaults with the person's own day start, before Effort and Cooling. */
+function personal(settings: Settings): HeatConfig {
   return { ...DEFAULT_CONFIG, dayStartHour: settings.dayStartHour };
+}
+
+/** The HEAT config in force now: the tuned defaults, with the person's own day start, Effort and Cooling. */
+export function heatConfig(settings: Settings): HeatConfig {
+  return tuned(personal(settings), currentTuning(settings));
+}
+
+/**
+ * Every config HEAT has been scored under: Standard until the first change of Effort or
+ * Cooling, then each change from the moment it was made. This is what the fold replays.
+ */
+export function heatTimeline(settings: Settings): ConfigTimeline {
+  const base = personal(settings);
+  return [
+    { from: Number.NEGATIVE_INFINITY, config: tuned(base, STANDARD_TUNING) },
+    ...settings.tuning.map((change) => ({ from: change.at, config: tuned(base, change) })),
+  ];
+}
+
+/**
+ * The completions HEAT counts: live ones made since the last reset. Earlier ones still say
+ * what is done; they just no longer warm anything.
+ */
+export function heatCompletions(state: AppState): Completion[] {
+  const since = state.heatResetAt ?? Number.NEGATIVE_INFINITY;
+  return liveCompletions(state).filter((completion) => completion.at > since);
 }
 
 /** The completion log as the engine should see it: undone completions left out. */

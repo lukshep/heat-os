@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { FULL_HEAT, MAX_HEAT } from './config';
+import { FULL_HEAT, MAX_HEAT, STANDARD_TUNING, tuned } from './config';
 import { DAY_MS, HOUR_MS } from './day';
 import {
   afterCompleting,
   applyGain,
   areaFactor,
+  configAt,
   cool,
+  coolBetween,
   flagPoints,
   foldHeat,
   gainFor,
@@ -13,6 +15,7 @@ import {
   traceHeat,
   warmthFactor,
   type CompletionFact,
+  type ConfigTimeline,
   type DayPosition,
   type HeatState,
   type Scorable,
@@ -345,5 +348,87 @@ describe('pricing the next completion', () => {
     expect(predicted.heat).toBeCloseTo(replayed.heat, 10);
     expect(predicted.areaCounts).toEqual(replayed.areaCounts);
     expect(gainFor(before, item, config)).toBeCloseTo(replayed.heat - before.heat, 10);
+  });
+});
+
+describe('Effort and Cooling', () => {
+  it('change nothing on Standard', () => {
+    expect(tuned(config, STANDARD_TUNING)).toEqual(config);
+  });
+
+  it('scale the gain scale for Effort', () => {
+    expect(tuned(config, { ...STANDARD_TUNING, effort: 'easier' }).gainScale).toBeCloseTo(75, 10);
+    expect(tuned(config, { ...STANDARD_TUNING, effort: 'harder' }).gainScale).toBeCloseTo(130, 10);
+  });
+
+  it('move the daily retention for Cooling, and leave points and the Surge rate alone', () => {
+    const slower = tuned(config, { ...STANDARD_TUNING, cooling: 'slower' });
+    expect(slower.dailyRetention).toBeCloseTo(0.85, 10);
+    expect(slower.surgeRetention).toBe(config.surgeRetention);
+    expect(slower.gainScale).toBe(config.gainScale);
+
+    const faster = tuned(config, { ...STANDARD_TUNING, cooling: 'faster' });
+    expect(faster.dailyRetention).toBeCloseTo(0.75, 10);
+    expect(faster.surgeRetention).toBe(config.surgeRetention);
+  });
+
+  it('never let Surge cool faster than the rest of the gauge', () => {
+    const close = { ...config, dailyRetention: 0.8, surgeRetention: 0.82 };
+    expect(tuned(close, { ...STANDARD_TUNING, cooling: 'slower' }).surgeRetention).toBeCloseTo(0.85, 10);
+  });
+});
+
+describe('a config that changes over time', () => {
+  const later = { ...config, dailyRetention: 0.5, gainScale: 200 };
+  const changeAt = (from: number): ConfigTimeline => [
+    { from: Number.NEGATIVE_INFINITY, config },
+    { from, config: later },
+  ];
+
+  it('is in force from the moment it is made', () => {
+    const timeline = changeAt(T0);
+    expect(configAt(timeline, T0 - 1)).toBe(config);
+    expect(configAt(timeline, T0)).toBe(later);
+    expect(configAt(timeline, T0 + DAY_MS)).toBe(later);
+  });
+
+  it('leaves the first config covering all time before the second', () => {
+    expect(configAt([{ from: T0, config }], T0 - DAY_MS)).toBe(config);
+  });
+
+  it('cools each stretch at the rate in force over it', () => {
+    expect(coolBetween(50, T0, T0 + 2 * DAY_MS, changeAt(T0 + DAY_MS))).toBeCloseTo(50 * 0.8 * 0.5, 10);
+    expect(coolBetween(50, T0, T0 + DAY_MS, changeAt(T0 + 2 * DAY_MS))).toBeCloseTo(50 * 0.8, 10);
+  });
+
+  it('gives the same HEAT as a single config when nothing has changed', () => {
+    const log = [fact(), fact({ at: T0 + HOUR_MS, areaId: 'health' }), fact({ at: T0 + DAY_MS, dayKey: DAY_2 })];
+    const now = T0 + 2 * DAY_MS;
+    expect(foldHeat(log, [{ from: Number.NEGATIVE_INFINITY, config }], now, DAY_2)).toEqual(
+      foldHeat(log, config, now, DAY_2),
+    );
+  });
+
+  it('does not move HEAT already earned', () => {
+    const log = [fact(), fact({ at: T0 + HOUR_MS, areaId: 'health' })];
+    const now = T0 + 3 * HOUR_MS;
+    expect(foldHeat(log, changeAt(now), now, DAY_1).heat).toBe(foldHeat(log, config, now, DAY_1).heat);
+    expect(foldHeat(log, changeAt(now + DAY_MS), now, DAY_1).heat).toBe(foldHeat(log, config, now, DAY_1).heat);
+  });
+
+  it('scores completions after the change with the new config, and those before it with the old', () => {
+    const second = fact({ at: T0 + 2 * HOUR_MS, areaId: 'health' });
+    const { scored } = traceHeat([fact(), second], changeAt(T0 + HOUR_MS), [second.at]);
+    expect(scored[0]?.heatAfter).toBeCloseTo(FIRST_TASK, 3);
+
+    const cooled = cool(FIRST_TASK, HOUR_MS, config);
+    const cooledAgain = cool(cooled, HOUR_MS, later);
+    const points = pointsFor(second, { inArea: 0, areasOpened: 1 }, later);
+    expect(scored[1]?.heatAfter).toBeCloseTo(applyGain(cooledAgain, points, later), 3);
+  });
+
+  it('cools at the new rate from the moment of the change', () => {
+    const heat = foldHeat([fact()], changeAt(T0 + DAY_MS), T0 + 2 * DAY_MS, DAY_2).heat;
+    expect(heat).toBeCloseTo(FIRST_TASK * 0.8 * 0.5, 3);
   });
 });
