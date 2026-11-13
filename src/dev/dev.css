@@ -207,7 +207,7 @@
   background: var(--viz-compare);
 }
 
-.chart-key.is-threshold {
+.chart-key.is-surge {
   height: 0;
   border-top: 1px dashed var(--viz-ink-2);
   border-radius: 0;
@@ -245,13 +245,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.chart-threshold {
+.chart-surge {
   stroke: var(--viz-ink-2);
   stroke-width: 1;
   stroke-dasharray: 4 4;
 }
 
-.chart-tick.is-threshold {
+.chart-tick.is-surge {
   fill: var(--viz-ink);
   font-weight: 600;
 }

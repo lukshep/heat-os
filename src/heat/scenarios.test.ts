@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG as config, MAX_HEAT } from './config';
+import { DEFAULT_CONFIG as config, FULL_HEAT, MAX_HEAT } from './config';
 import { DAY_MS, HOUR_MS } from './day';
-import { cool, gainFor, pointsFor, type HeatState, type Scorable } from './engine';
+import { applyGain, cool, gainFor, pointsFor, type HeatState, type Scorable } from './engine';
 import { SCENARIOS, simulate, type Scenario } from './sim';
 
 /** A daily pattern done in one sitting at 18:00, which is how docs/SPEC.md states its figures. */
@@ -23,46 +23,117 @@ function daily(overrides: Partial<Scenario>): Scenario {
   };
 }
 
-const MAINTENANCE = daily({ areas: 4, tasks: 8 });
-const DEEP = daily({ areas: 3, tasks: 9 });
-const BIG = daily({ areas: 4, tasks: 12, important: 1 });
+const BALANCED = daily({ areas: 4, tasks: 8 });
+const BALANCED_FLAGGED = daily({ areas: 4, tasks: 8, important: 1, avoided: 1 });
 const LIGHT = daily({ areas: 3, tasks: 6 });
+const BIG = daily({ areas: 4, tasks: 12, important: 1, avoided: 1 });
+const HUGE = daily({ areas: 4, tasks: 12, important: 2, avoided: 2, routines: 3 });
 const ONE_PER_AREA = daily({ areas: 5, tasks: 5 });
 const ONE_AREA_UNLIMITED = daily({ areas: 1, tasks: 200 });
 const ROUTINES_AND_TASKS = daily({ areas: 3, tasks: 3, routines: 3, fromHour: 8, toHour: 20 });
 
 const SETTLED = 56;
 const plain: Scorable = { areaId: 'work', important: false, avoided: false, warmth: 0 };
-const cold: HeatState = { heat: 0, now: 0, today: '2026-01-05', areaCounts: {}, flaggedToday: 0 };
+const cold: HeatState = { heat: 0, now: 0, today: '2026-01-05', areaCounts: {} };
 
 function pointsADay(scenario: Scenario): number {
   return simulate(scenario, config, 1).stats.pointsPerActiveDay;
 }
 
+function settled(scenario: Scenario) {
+  return simulate(scenario, config, SETTLED).stats;
+}
+
 /**
- * What the design promises. The aim is to bring HEAT up to the line at some point each day.
- * These should survive retuning; if one has to change, the product has changed and
- * docs/SPEC.md needs to say so.
+ * What the design promises. HEAT is a gauge of recent activity and consistency, with no line
+ * to reach and no daily pass or fail. These should survive retuning; if one has to change,
+ * the product has changed and docs/SPEC.md needs to say so.
  */
 describe('design invariants', () => {
-  it('brings a maintenance day up to the line every day', () => {
-    const { stats } = simulate(MAINTENANCE, config, SETTLED);
-    expect(stats.daysAtLine).toBe(1);
+  it('keeps consistent, balanced activity at about 70 to 85', () => {
+    const { settledPeak, settledLow } = settled(BALANCED);
+    expect(settledPeak).toBeGreaterThan(80);
+    expect(settledPeak).toBeLessThan(90);
+    expect(settledLow).toBeGreaterThan(65);
+    expect(settledLow).toBeLessThan(75);
   });
 
-  it('lets depth stand in for a fourth area', () => {
-    expect(simulate(DEEP, config, SETTLED).stats.daysAtLine).toBe(1);
+  it('does not let a balanced day fill the gauge, however long it is kept up', () => {
+    const { settledPeak, surgeShare } = settled(BALANCED);
+    expect(settledPeak).toBeLessThan(FULL_HEAT);
+    expect(surgeShare).toBe(0);
   });
 
-  it('does not let one task in each area reach the line', () => {
-    const { stats } = simulate(ONE_PER_AREA, config, SETTLED);
-    expect(stats.settledPeak).toBeLessThan(config.threshold);
-    expect(stats.reachesLineOnDay).toBeNull();
+  it('makes a full gauge hard: two balanced days of work in one day is not enough', () => {
+    const low = settled(BALANCED).settledLow;
+    expect(applyGain(low, 2 * pointsADay(BALANCED), config)).toBeLessThan(FULL_HEAT);
   });
 
-  it('does not let one area reach the line, however much is done', () => {
-    const { stats } = simulate(ONE_AREA_UNLIMITED, config, SETTLED);
-    expect(stats.settledPeak).toBeLessThan(config.threshold);
+  it('makes a full gauge possible: a huge day, kept up, surges', () => {
+    const { settledPeak, surgeShare } = settled(HUGE);
+    expect(settledPeak).toBeGreaterThan(FULL_HEAT);
+    expect(surgeShare).toBeGreaterThan(0);
+    expect(surgeShare).toBeLessThan(1);
+  });
+
+  it('never passes the ceiling, even under absurd farming', () => {
+    const absurd = daily({ areas: 6, tasks: 300, important: 300, avoided: 300, routines: 6 });
+    const heats = simulate(absurd, config, 60).samples.map((sample) => sample.heat);
+    expect(Math.min(...heats)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...heats)).toBeLessThanOrEqual(MAX_HEAT);
+  });
+
+  it('lets a Surge hold its heat longer than ordinary cooling would', () => {
+    const plainRate = { ...config, surgeRetention: config.dailyRetention };
+    expect(cool(110, 12 * HOUR_MS, config)).toBeGreaterThan(FULL_HEAT);
+    expect(cool(110, 12 * HOUR_MS, plainRate)).toBeLessThan(FULL_HEAT);
+    expect(cool(110, DAY_MS, config)).toBeGreaterThan(cool(110, DAY_MS, plainRate));
+  });
+
+  it('does not let Surge become permanent for a huge day', () => {
+    expect(settled(HUGE).settledLow).toBeLessThan(FULL_HEAT);
+  });
+
+  it('builds quickly from cold and slowly near the top', () => {
+    const low = gainFor(cold, plain, config);
+    const high = gainFor({ ...cold, heat: 95 }, plain, config);
+    expect(low).toBeGreaterThanOrEqual(6);
+    expect(high).toBeLessThan(low / 3);
+  });
+
+  it('does not punish a day of rest', () => {
+    const { settledPeak } = settled(BALANCED);
+    expect(cool(settledPeak, DAY_MS, config)).toBeGreaterThan(65);
+    expect(cool(settledPeak, 2 * DAY_MS, config)).toBeGreaterThan(50);
+  });
+
+  it('comes back within three balanced days of a week away', () => {
+    const weekOff = { ...BALANCED, daysOn: 14, daysOff: 7 };
+    const { samples } = simulate(weekOff, config, 42);
+    // Days 14-20 are off; day 21 is the first day back and day 23 the third.
+    const thirdDayBack = samples.filter((sample) => sample.day >= 23 && sample.day < 24);
+    expect(Math.max(...thirdDayBack.map((sample) => sample.heat))).toBeGreaterThan(70);
+  });
+
+  it('pays a flag in full wherever the task falls in its area', () => {
+    const flagged: Scorable = { ...plain, important: true };
+    const bonusAt = (inArea: number) => {
+      const position = { inArea, areasOpened: 1 };
+      return pointsFor(flagged, position, config) - pointsFor(plain, position, config);
+    };
+    expect(bonusAt(0)).toBeCloseTo(bonusAt(6), 10);
+    expect(bonusAt(6)).toBeGreaterThanOrEqual(config.basePoints / 2);
+  });
+
+  it('makes a flagged task deep in an area worth about as much as a fresh start elsewhere', () => {
+    const both: Scorable = { ...plain, important: true, avoided: true };
+    const deepAndFlagged = pointsFor(both, { inArea: 3, areasOpened: 1 }, config);
+    const freshArea = pointsFor(plain, { inArea: 0, areasOpened: 1 }, config);
+    expect(deepAndFlagged).toBeGreaterThan(freshArea);
+  });
+
+  it('lifts a balanced day when two of its tasks are flagged', () => {
+    expect(settled(BALANCED_FLAGGED).settledPeak).toBeGreaterThan(settled(BALANCED).settledPeak + 3);
   });
 
   it('pays less than four times as much for one task split into twenty', () => {
@@ -76,57 +147,20 @@ describe('design invariants', () => {
   });
 
   it('keeps returns within an area worthwhile over several tasks', () => {
-    const fourth = pointsFor(plain, { inArea: 3, areasOpened: 1, flagged: 0 }, config);
-    const eighth = pointsFor(plain, { inArea: 7, areasOpened: 1, flagged: 0 }, config);
+    const fourth = pointsFor(plain, { inArea: 3, areasOpened: 1 }, config);
+    const eighth = pointsFor(plain, { inArea: 7, areasOpened: 1 }, config);
     expect(fourth).toBeGreaterThan(config.basePoints / 3);
     expect(eighth).toBeLessThan(config.basePoints / 3);
   });
 
-  it('pays a smaller bonus for every further area, but always more than a repeat', () => {
-    const first = (areasOpened: number) => pointsFor(plain, { inArea: 0, areasOpened, flagged: 0 }, config);
-    const repeat = pointsFor(plain, { inArea: 1, areasOpened: 1, flagged: 0 }, config);
-    for (let opened = 1; opened < 8; opened++) {
-      expect(first(opened)).toBeLessThan(first(opened - 1));
-      expect(first(opened)).toBeGreaterThan(repeat);
-    }
-  });
-
-  it('stays within 0-100 under absurd farming', () => {
-    const absurd = daily({ areas: 6, tasks: 300, important: 300, avoided: 300, routines: 6 });
-    const heats = simulate(absurd, config, 60).samples.map((sample) => sample.heat);
-    expect(Math.min(...heats)).toBeGreaterThanOrEqual(0);
-    expect(Math.max(...heats)).toBeLessThanOrEqual(MAX_HEAT);
-    expect(Math.max(...heats)).toBeGreaterThan(config.threshold);
-  });
-
-  it('carries very high HEAT through a day of inactivity', () => {
-    // 75 is still at the line a full day later; 86 is still there the morning after a skipped day.
-    expect(cool(75, DAY_MS, config)).toBeGreaterThanOrEqual(config.threshold);
-    expect(cool(86, 38 * HOUR_MS, config)).toBeGreaterThanOrEqual(config.threshold);
-  });
-
-  it('makes the first task from cold move the bar', () => {
-    expect(gainFor(cold, plain, config)).toBeGreaterThanOrEqual(4);
-  });
-
-  it('gets back to the line from cold within a week of maintenance days, sooner with big ones', () => {
-    const maintenance = simulate(MAINTENANCE, config, 14).stats.reachesLineOnDay;
-    const big = simulate(BIG, config, 14).stats.reachesLineOnDay;
-    expect(maintenance ?? Infinity).toBeLessThan(7);
-    expect(big ?? Infinity).toBeLessThan(4);
+  it('keeps one area, however hard it is worked, below a balanced day', () => {
+    expect(settled(ONE_AREA_UNLIMITED).settledPeak).toBeLessThan(settled(BALANCED).settledPeak - 10);
   });
 
   it('does not let weekend bursts stand in for consistency', () => {
-    const weekendWarrior = { ...BIG, daysOn: 2, daysOff: 5 };
-    expect(simulate(weekendWarrior, config, 42).stats.daysAtLine).toBeLessThan(0.5);
-  });
-
-  it('recovers within four big days of returning from a week away', () => {
-    const weekOff = { ...BIG, daysOn: 14, daysOff: 7 };
-    const { samples } = simulate(weekOff, config, 42);
-    // Days 14-20 are off; day 21 is the first day back and day 24 the fourth.
-    const fourthDayBack = samples.filter((sample) => sample.day >= 24 && sample.day < 25);
-    expect(Math.max(...fourthDayBack.map((sample) => sample.heat))).toBeGreaterThanOrEqual(config.threshold);
+    const weekendWarrior = settled({ ...BIG, daysOn: 2, daysOff: 5 });
+    expect(weekendWarrior.settledLow).toBeLessThan(settled(BALANCED).settledLow / 2);
+    expect(weekendWarrior.settledPeak).toBeLessThan(settled(BIG).settledPeak);
   });
 
   it('makes a kept routine worth nearly twice a new one', () => {
@@ -134,7 +168,7 @@ describe('design invariants', () => {
     const { scored, stats } = simulate(kept, config, 21);
     const first = scored[0]?.points ?? 0;
     const last = scored[scored.length - 1]?.points ?? 0;
-    expect(first).toBeCloseTo(pointsFor(plain, { inArea: 0, areasOpened: 0, flagged: 0 }, config), 6);
+    expect(first).toBeCloseTo(pointsFor(plain, { inArea: 0, areasOpened: 0 }, config), 6);
     expect(last).toBeGreaterThan(1.9 * first);
     expect(stats.routineWarmth ?? 0).toBeGreaterThan(0.95);
   });
@@ -146,10 +180,8 @@ describe('design invariants', () => {
     expect(warmthOf(2)).toBeLessThan(warmthOf(3));
   });
 
-  it('lets consistency carry a day over the line that the same effort leaves short', () => {
-    // Six completions across three areas: short as plain tasks, enough once three of them are warm routines.
-    expect(simulate(LIGHT, config, SETTLED).stats.settledPeak).toBeLessThan(config.threshold);
-    expect(simulate(ROUTINES_AND_TASKS, config, SETTLED).stats.daysAtLine).toBe(1);
+  it('lets consistency lift the same effort: warm routines beat the same count of plain tasks', () => {
+    expect(settled(ROUTINES_AND_TASKS).settledPeak).toBeGreaterThan(settled(LIGHT).settledPeak + 5);
   });
 });
 
@@ -158,26 +190,32 @@ describe('design invariants', () => {
  * DEFAULT_CONFIG is retuned: update them, the table and the tuning log together.
  */
 describe('calibration snapshot', () => {
-  const table: [string, Scenario, number][] = [
-    ['one task in each of 5 areas', ONE_PER_AREA, 54],
-    ['one task in each of 6 areas', daily({ areas: 6, tasks: 6 }), 59],
-    ['two tasks in each of 3 areas', LIGHT, 55],
-    ['two tasks in each of 4 areas', MAINTENANCE, 62],
-    ['three tasks in each of 3 areas', DEEP, 62],
-    ['three tasks in each of 4 areas', daily({ areas: 4, tasks: 12 }), 69],
-    ['one area, unlimited tasks', ONE_AREA_UNLIMITED, 50],
-    ['three warm routines alone', { ...ROUTINES_AND_TASKS, tasks: 0 }, 58],
-    ['three warm routines and three tasks', ROUTINES_AND_TASKS, 65],
+  const table: [string, Scenario, number, number][] = [
+    ['one task in each of 5 areas', ONE_PER_AREA, 76, 61],
+    ['light day', LIGHT, 77, 61],
+    ['balanced day', BALANCED, 85, 68],
+    ['balanced day, two flagged', BALANCED_FLAGGED, 90, 72],
+    ['big day', BIG, 96, 77],
+    ['huge day', HUGE, 107, 88],
+    ['one area, unlimited tasks', ONE_AREA_UNLIMITED, 71, 57],
   ];
 
-  it.each(table)('%s peaks where the spec says', (_name, scenario, peak) => {
-    expect(Math.round(simulate(scenario, config, SETTLED).stats.settledPeak)).toBe(peak);
+  it.each(table)('%s settles where the spec says', (_name, scenario, peak, low) => {
+    const stats = settled(scenario);
+    expect(Math.round(stats.settledPeak)).toBe(peak);
+    expect(Math.round(stats.settledLow)).toBe(low);
   });
 
   it('scores the reference days as the spec says', () => {
-    expect(pointsADay(ONE_PER_AREA)).toBeCloseTo(63.87, 2);
-    expect(pointsADay(MAINTENANCE)).toBeCloseTo(84.67, 2);
-    expect(pointsADay(DEEP)).toBeCloseTo(84.15, 2);
+    expect(pointsADay(BALANCED)).toBeCloseTo(84.67, 2);
+    expect(pointsADay(BALANCED_FLAGGED)).toBeCloseTo(99.67, 2);
+    expect(pointsADay(LIGHT)).toBeCloseTo(64.95, 2);
+  });
+
+  it('needs about 206 points in a day to fill the gauge from a balanced routine', () => {
+    const low = settled(BALANCED).settledLow;
+    const needed = -config.gainScale * Math.log((MAX_HEAT - FULL_HEAT) / (MAX_HEAT - low));
+    expect(Math.round(needed)).toBe(206);
   });
 });
 
@@ -187,7 +225,7 @@ describe('presets', () => {
     expect(samples.length).toBeGreaterThan(42 * 24);
     expect(samples.every((sample) => Number.isFinite(sample.heat))).toBe(true);
     expect(stats.settledPeak).toBeGreaterThan(0);
-    expect(stats.daysAtLine).toBeGreaterThanOrEqual(0);
-    expect(stats.daysAtLine).toBeLessThanOrEqual(1);
+    expect(stats.surgeShare).toBeGreaterThanOrEqual(0);
+    expect(stats.surgeShare).toBeLessThanOrEqual(1);
   });
 });

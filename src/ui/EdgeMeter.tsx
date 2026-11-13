@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { MAX_HEAT } from '../heat/config';
-import { edgePath, edgePoint, type EdgeShape } from './edgePath';
+import { FULL_HEAT, MAX_HEAT } from '../heat/config';
+import { edgePath, type EdgeShape } from './edgePath';
 import { heatColor } from './temperature';
 
 interface Props {
   heat: number;
-  threshold: number;
 }
 
 /** A rise of at least this much makes the line flare. Cooling and tiny gains do not. */
@@ -23,6 +22,10 @@ const INSET = 2;
 const SCREEN_RADIUS = 52;
 const WINDOW_RADIUS = 20;
 
+/** The line's width when it is not surging, and how much the peak of Surge adds to it. */
+const LINE_WIDTH = 4;
+const SURGE_WIDTH = 5;
+
 /** True when installed on a phone, where the app is drawn right to the edges of the glass. */
 function fillsPhoneScreen(): boolean {
   const installed =
@@ -33,12 +36,20 @@ function fillsPhoneScreen(): boolean {
 
 /**
  * HEAT as a line of light round the edge of the screen. It starts at the top centre and
- * grows clockwise, so halfway is the bottom centre and a full loop is 100. Its colour is
- * its temperature, a bright tip marks the leading end, and a dot on the edge is the line
- * to reach. It sits over every screen and takes no touches.
+ * grows clockwise, so halfway is the bottom centre and the loop closes at a full gauge. Its
+ * colour is its temperature and a bright tip marks the leading end. There is no mark to
+ * reach: the line is a gauge, not a target.
+ *
+ * Past full is Surge. The loop is closed, so the extra shows as intensity: the line
+ * thickens, its glow widens, it pales towards white-hot, and a slow shimmer travels round
+ * it. It sits over every screen and takes no touches.
  */
-export function EdgeMeter({ heat, threshold }: Props) {
+export function EdgeMeter({ heat }: Props) {
   const level = Math.max(0, Math.min(MAX_HEAT, heat));
+  /** 0 at a full gauge or below, 1 at the ceiling. */
+  const surge = Math.max(0, level - FULL_HEAT) / (MAX_HEAT - FULL_HEAT);
+  const filled = Math.min(level, FULL_HEAT);
+
   const frame = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [radius] = useState(() => (fillsPhoneScreen() ? SCREEN_RADIUS : WINDOW_RADIUS));
@@ -53,54 +64,51 @@ export function EdgeMeter({ heat, threshold }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  const previous = useRef({ level, threshold });
+  const previous = useRef(level);
   const [flares, setFlares] = useState(0);
-  const [arrivals, setArrivals] = useState(0);
 
   useEffect(() => {
-    const before = previous.current;
-    previous.current = { level, threshold };
-    const rose = level - before.level >= FLARE_STEP;
-    if (rose) setFlares((count) => count + 1);
-    // The mark answers only when HEAT climbs to it, never because the mark was moved.
-    if (rose && before.threshold === threshold && before.level < threshold && level >= threshold) {
-      setArrivals((count) => count + 1);
-    }
-  }, [level, threshold]);
+    if (level - previous.current >= FLARE_STEP) setFlares((count) => count + 1);
+    previous.current = level;
+  }, [level]);
 
   const shape: EdgeShape = { ...size, inset: INSET, radius };
   const path = edgePath(shape);
-  const mark = edgePoint(shape, threshold / MAX_HEAT);
-  // pathLength makes the path 100 long, so offsets are HEAT itself.
-  const line = { strokeDasharray: `${MAX_HEAT} ${MAX_HEAT}`, strokeDashoffset: MAX_HEAT - level };
-  const tip = { strokeDasharray: `0.001 ${MAX_HEAT}`, strokeDashoffset: -level };
+  // pathLength makes the path one full gauge long, so offsets are HEAT itself.
+  const line = { strokeDasharray: `${FULL_HEAT} ${FULL_HEAT}`, strokeDashoffset: FULL_HEAT - filled };
+  const tip = { strokeDasharray: `0.001 ${FULL_HEAT}`, strokeDashoffset: -filled };
+
+  const className = ['edge', level < COLD && 'is-cold', surge > 0 && 'is-surging'].filter(Boolean).join(' ');
+  const style = {
+    '--edge-color': heatColor(level / FULL_HEAT),
+    '--edge-width': `${(LINE_WIDTH + SURGE_WIDTH * surge).toFixed(2)}px`,
+    '--edge-surge': surge.toFixed(3),
+  } as CSSProperties;
 
   // The number is deliberately not shown. It is still announced for anyone who cannot see the line.
   return (
     <div
       ref={frame}
-      className={level < COLD ? 'edge is-cold' : 'edge'}
-      style={{ '--edge-color': heatColor(level / MAX_HEAT) } as CSSProperties}
+      className={className}
+      style={style}
       role="meter"
       aria-label="HEAT"
       aria-valuemin={0}
       aria-valuemax={MAX_HEAT}
       aria-valuenow={Math.round(level)}
-      aria-valuetext={`${Math.round(level)} of ${MAX_HEAT}. The line is at ${threshold}.`}
+      aria-valuetext={
+        surge > 0
+          ? `${Math.round(level)}, in Surge. A full gauge is ${FULL_HEAT}.`
+          : `${Math.round(level)} of ${FULL_HEAT}`
+      }
     >
       {size.width > 0 && size.height > 0 && (
         <svg width={size.width} height={size.height} aria-hidden="true">
           <path className="edge-track" d={path} />
-          {flares > 0 && <path key={flares} className="edge-flare" d={path} pathLength={MAX_HEAT} style={line} />}
-          <path className="edge-line" d={path} pathLength={MAX_HEAT} style={line} />
-          <path className="edge-tip" d={path} pathLength={MAX_HEAT} style={tip} />
-          <circle
-            key={`mark-${arrivals}`}
-            className={arrivals > 0 ? 'edge-mark is-reached' : 'edge-mark'}
-            cx={mark.x}
-            cy={mark.y}
-            r={3.5}
-          />
+          {flares > 0 && <path key={flares} className="edge-flare" d={path} pathLength={FULL_HEAT} style={line} />}
+          <path className="edge-line" d={path} pathLength={FULL_HEAT} style={line} />
+          <path className="edge-tip" d={path} pathLength={FULL_HEAT} style={tip} />
+          {surge > 0 && <path className="edge-shimmer" d={path} pathLength={FULL_HEAT} />}
         </svg>
       )}
     </div>

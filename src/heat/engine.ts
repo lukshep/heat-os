@@ -1,4 +1,4 @@
-import { MAX_HEAT, type HeatConfig } from './config';
+import { FULL_HEAT, MAX_HEAT, type HeatConfig } from './config';
 import { DAY_MS, type DayKey } from './day';
 
 /** What scoring needs to know about something that could be completed. */
@@ -26,8 +26,6 @@ export interface DayPosition {
   inArea: number;
   /** Areas that already have a completion today. */
   areasOpened: number;
-  /** Flagged completions already logged today. */
-  flagged: number;
 }
 
 export interface HeatState {
@@ -36,8 +34,6 @@ export interface HeatState {
   today: DayKey;
   /** Completions so far today, keyed by `areaBucket`. */
   areaCounts: Readonly<Record<string, number>>;
-  /** Important or Avoided completions so far today. */
-  flaggedToday: number;
 }
 
 export interface ScoredCompletion {
@@ -61,14 +57,26 @@ export function areaBucket(areaId: string | null): string {
   return areaId ?? UNASSIGNED;
 }
 
-export function isFlagged(item: Scorable): boolean {
-  return item.important || item.avoided;
-}
-
-/** HEAT after cooling for `elapsedMs` with no activity. */
+/**
+ * HEAT after cooling for `elapsedMs` with no activity. Above a full gauge it cools at the
+ * slower Surge rate until it is back to full, then at the ordinary rate. The two meet at
+ * FULL_HEAT, so the curve has no step, and nothing but HEAT's own level decides the rate.
+ */
 export function cool(heat: number, elapsedMs: number, config: HeatConfig): number {
   if (elapsedMs <= 0) return heat;
-  return heat * Math.pow(config.dailyRetention, elapsedMs / DAY_MS);
+  let days = elapsedMs / DAY_MS;
+  let level = heat;
+
+  if (level > FULL_HEAT) {
+    const slow = config.surgeRetention;
+    if (slow >= 1) return level;
+    const daysToFull = slow > 0 ? Math.log(FULL_HEAT / level) / Math.log(slow) : 0;
+    if (days <= daysToFull) return level * Math.pow(slow, days);
+    days -= daysToFull;
+    level = FULL_HEAT;
+  }
+
+  return level * Math.pow(config.dailyRetention, days);
 }
 
 /**
@@ -82,33 +90,41 @@ export function areaFactor(areaId: string | null, position: DayPosition, config:
   return repeat + config.firstInAreaBonus * Math.pow(config.areaBonusDecay, position.areasOpened);
 }
 
+/** Multiplier from a routine's warmth: 1 for a task or a cold routine, more as it warms. */
+export function warmthFactor(item: Scorable, config: HeatConfig): number {
+  return 1 + config.warmthBonus * Math.min(1, Math.max(0, item.warmth));
+}
+
 /**
- * Multiplier from the item itself. Flags and routine warmth add, they do not compound,
- * and the flag bonus shrinks with every flagged completion already logged today.
+ * Flat points for the Important and Avoided flags. They are added after everything else,
+ * so they are worth the same on the first task of the day and the tenth in an area.
  */
-export function quality(item: Scorable, position: DayPosition, config: HeatConfig): number {
-  const warmth = Math.min(1, Math.max(0, item.warmth));
-  const flags = (item.important ? config.importantBonus : 0) + (item.avoided ? config.avoidedBonus : 0);
-  return 1 + flags * Math.pow(config.flagDecay, position.flagged) + config.warmthBonus * warmth;
+export function flagPoints(item: Scorable, config: HeatConfig): number {
+  const share = (item.important ? config.importantBonus : 0) + (item.avoided ? config.avoidedBonus : 0);
+  return config.basePoints * share;
 }
 
 /** What a completion is worth before HEAT resistance. */
 export function pointsFor(item: Scorable, position: DayPosition, config: HeatConfig): number {
-  return config.basePoints * areaFactor(item.areaId, position, config) * quality(item, position, config);
+  const placed = config.basePoints * areaFactor(item.areaId, position, config) * warmthFactor(item, config);
+  return placed + flagPoints(item, config);
 }
 
-/** HEAT after earning `points`: each point closes a fraction of the remaining gap to the maximum. */
+/**
+ * HEAT after earning `points`: each point closes a fraction of the remaining gap to the
+ * ceiling. The ceiling is above a full gauge, so 100 can be passed, but only just.
+ */
 export function applyGain(heat: number, points: number, config: HeatConfig): number {
   return MAX_HEAT - (MAX_HEAT - heat) * Math.exp(-points / config.gainScale);
 }
 
 /** Where `item` would fall in a day that already holds these completions. */
-function positionOf(areaCounts: Readonly<Record<string, number>>, flagged: number, item: Scorable): DayPosition {
+function positionOf(areaCounts: Readonly<Record<string, number>>, item: Scorable): DayPosition {
   let areasOpened = 0;
   for (const bucket of Object.keys(areaCounts)) {
     if (bucket !== UNASSIGNED) areasOpened += 1;
   }
-  return { inArea: areaCounts[areaBucket(item.areaId)] ?? 0, areasOpened, flagged };
+  return { inArea: areaCounts[areaBucket(item.areaId)] ?? 0, areasOpened };
 }
 
 /**
@@ -136,7 +152,7 @@ export function traceHeat(
   sampleTimes: readonly number[],
 ): HeatTrace {
   const events = countable(completions);
-  const days = new Map<DayKey, { areaCounts: Record<string, number>; flagged: number }>();
+  const days = new Map<DayKey, Record<string, number>>();
   const scored: ScoredCompletion[] = [];
   const samples: number[] = [];
   let heat = 0;
@@ -149,21 +165,20 @@ export function traceHeat(
     previous = time;
 
     for (let event = events[next]; event !== undefined && event.at <= time; event = events[++next]) {
-      let day = days.get(event.dayKey);
-      if (!day) {
-        day = { areaCounts: {}, flagged: 0 };
-        days.set(event.dayKey, day);
+      let areaCounts = days.get(event.dayKey);
+      if (!areaCounts) {
+        areaCounts = {};
+        days.set(event.dayKey, areaCounts);
       }
 
       const before = cool(heat, event.at - heatAt, config);
-      const points = pointsFor(event, positionOf(day.areaCounts, day.flagged, event), config);
+      const points = pointsFor(event, positionOf(areaCounts, event), config);
       heat = applyGain(before, points, config);
       heatAt = event.at;
       scored.push({ fact: event, points, gain: heat - before, heatAfter: heat });
 
       const bucket = areaBucket(event.areaId);
-      day.areaCounts[bucket] = (day.areaCounts[bucket] ?? 0) + 1;
-      if (isFlagged(event)) day.flagged += 1;
+      areaCounts[bucket] = (areaCounts[bucket] ?? 0) + 1;
     }
 
     samples.push(cool(heat, time - heatAt, config));
@@ -181,29 +196,26 @@ export function foldHeat(
 ): HeatState {
   const { samples, scored } = traceHeat(completions, config, [now]);
   const areaCounts: Record<string, number> = {};
-  let flaggedToday = 0;
   for (const { fact } of scored) {
     if (fact.dayKey !== today) continue;
     const bucket = areaBucket(fact.areaId);
     areaCounts[bucket] = (areaCounts[bucket] ?? 0) + 1;
-    if (isFlagged(fact)) flaggedToday += 1;
   }
-  return { heat: samples[0] ?? 0, now, today, areaCounts, flaggedToday };
+  return { heat: samples[0] ?? 0, now, today, areaCounts };
 }
 
 /** HEAT the item would add if completed right now. This is what an item's colour shows. */
 export function gainFor(state: HeatState, item: Scorable, config: HeatConfig): number {
-  const points = pointsFor(item, positionOf(state.areaCounts, state.flaggedToday, item), config);
+  const points = pointsFor(item, positionOf(state.areaCounts, item), config);
   return applyGain(state.heat, points, config) - state.heat;
 }
 
 /** The state that would result from completing the item right now. */
 export function afterCompleting(state: HeatState, item: Scorable, config: HeatConfig): HeatState {
-  const position = positionOf(state.areaCounts, state.flaggedToday, item);
+  const position = positionOf(state.areaCounts, item);
   return {
     ...state,
     heat: applyGain(state.heat, pointsFor(item, position, config), config),
     areaCounts: { ...state.areaCounts, [areaBucket(item.areaId)]: position.inArea + 1 },
-    flaggedToday: state.flaggedToday + (isFlagged(item) ? 1 : 0),
   };
 }

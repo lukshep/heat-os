@@ -157,13 +157,16 @@ button {
   stroke-width: 3;
 }
 
+/* Width and glow both grow with Surge; below a full gauge --edge-surge is 0 and they rest. */
 .edge-line {
   stroke: var(--edge-color);
-  stroke-width: 4;
-  filter: drop-shadow(0 0 6px var(--edge-color));
+  stroke-width: var(--edge-width);
+  filter: drop-shadow(0 0 calc(6px + var(--edge-surge) * 12px) var(--edge-color));
   transition:
     stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
     stroke 700ms ease,
+    stroke-width 700ms ease,
+    filter 700ms ease,
     opacity 300ms ease;
 }
 
@@ -177,8 +180,10 @@ button {
     opacity 300ms ease;
 }
 
+/* Nothing to show when cold. In Surge the loop has closed, so there is no leading end. */
 .edge.is-cold .edge-line,
-.edge.is-cold .edge-tip {
+.edge.is-cold .edge-tip,
+.edge.is-surging .edge-tip {
   opacity: 0;
 }
 
@@ -197,24 +202,23 @@ button {
   }
 }
 
-/* The line to reach. A dark rim keeps it readable once the light has passed under it. */
-.edge-mark {
-  fill: var(--text);
-  stroke: var(--bg);
-  stroke-width: 2;
-  transform-box: fill-box;
-  transform-origin: center;
+/*
+ * Surge only: a short stretch of white-hot light that travels slowly round the closed loop.
+ * It is brighter the deeper into Surge HEAT is. The reduced-motion rule at the end of this
+ * file stops it travelling, leaving a still highlight at the top of the screen.
+ */
+.edge-shimmer {
+  stroke: #fff;
+  stroke-width: calc(var(--edge-width) - 1px);
+  stroke-dasharray: 9 91;
+  opacity: calc(0.35 + var(--edge-surge) * 0.55);
+  filter: blur(1.5px);
+  animation: edge-shimmer 7s linear infinite;
 }
 
-/* The one moment the mark answers back: HEAT has just risen to meet it. Nothing is kept of it. */
-.edge-mark.is-reached {
-  animation: edge-reached 1100ms ease-out;
-}
-
-@keyframes edge-reached {
-  20% {
-    transform: scale(2.4);
-    filter: drop-shadow(0 0 8px #fff);
+@keyframes edge-shimmer {
+  to {
+    stroke-dashoffset: -100;
   }
 }
 
@@ -568,13 +572,6 @@ button {
   margin: 0;
   color: var(--faint);
   font-size: 14px;
-}
-
-.setting input[type='range'] {
-  width: 100%;
-  min-height: 44px;
-  margin: 0;
-  accent-color: var(--accent);
 }
 
 .setting select {

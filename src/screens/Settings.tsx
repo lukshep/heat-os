@@ -3,7 +3,6 @@ import { exportBackup, readBackup } from '../app/backup';
 import { useActions } from '../app/store';
 import type { View } from '../app/view';
 import { SETTING_LIMITS } from '../data/model';
-import { MAX_HEAT } from '../heat/config';
 
 const HOURS = Array.from(
   { length: SETTING_LIMITS.dayStartHour.max - SETTING_LIMITS.dayStartHour.min + 1 },
@@ -16,10 +15,10 @@ function hourName(hour: number): string {
   return new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).format(new Date(2026, 0, 1, hour));
 }
 
-/** The two things a person can set for themselves, and the backup that carries their data. */
+/** The one thing a person can set for themselves, and the backup that carries their data. */
 export function Settings({ view }: { view: View }) {
   const actions = useActions();
-  const { threshold, dayStartHour } = view.state.settings;
+  const { dayStartHour } = view.state.settings;
   const fileInput = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState('');
 
@@ -33,23 +32,6 @@ export function Settings({ view }: { view: View }) {
 
   return (
     <div className="settings">
-      {/* No number is shown: the mark itself moves along the edge of the screen. */}
-      <label className="setting">
-        <span className="setting-name">The line</span>
-        <input
-          type="range"
-          min={SETTING_LIMITS.threshold.min}
-          max={SETTING_LIMITS.threshold.max}
-          step={SETTING_LIMITS.threshold.step}
-          value={threshold}
-          aria-valuetext={`${threshold} of ${MAX_HEAT}`}
-          onChange={(event) => actions.updateSettings({ threshold: Number(event.target.value) })}
-        />
-        <span className="setting-note">
-          How much HEAT to aim for each day. Watch the mark move along the edge of the screen.
-        </span>
-      </label>
-
       <label className="setting">
         <span className="setting-name">A new day starts at</span>
         <select

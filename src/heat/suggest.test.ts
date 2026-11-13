@@ -3,7 +3,7 @@ import type { HeatState } from './engine';
 import { suggest, type Candidate } from './suggest';
 import { TEST_CONFIG as config } from './testConfig';
 
-const state: HeatState = { heat: 40, now: 0, today: '2026-01-05', areaCounts: {}, flaggedToday: 0 };
+const state: HeatState = { heat: 40, now: 0, today: '2026-01-05', areaCounts: {} };
 
 function candidate(id: string, areaId: string | null, overrides: Partial<Candidate> = {}): Candidate {
   return { id, areaId, important: false, avoided: false, warmth: 0, createdAt: 0, ...overrides };
@@ -40,10 +40,9 @@ describe('suggest', () => {
     ];
     expect(ids(suggest(pool, state, config, 3))).toEqual(['both', 'important', 'plain']);
 
-    // A fully warm routine is worth as much as a task with both flags, and more than one flag.
+    // First in its area, a fully warm routine doubles (40) where two flags add a flat 10 (30).
     const routine = candidate('routine', 'work', { createdAt: 4, warmth: 1 });
-    expect(ids(suggest([...pool, routine], state, config, 1))).toEqual(['both']);
-    expect(ids(suggest([pool[0]!, pool[1]!, routine], state, config, 1))).toEqual(['routine']);
+    expect(ids(suggest([...pool, routine], state, config, 2))).toEqual(['routine', 'both']);
   });
 
   it('puts an item with a home ahead of an unfiled one', () => {

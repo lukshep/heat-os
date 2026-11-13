@@ -101,7 +101,7 @@ function Shell({ saving }: Props) {
   return (
     <div className="app">
       {/* HEAT runs round the edge of every screen, so no screen needs a bar of its own. */}
-      <EdgeMeter heat={view.heat.heat} threshold={view.config.threshold} />
+      <EdgeMeter heat={view.heat.heat} />
 
       <header className="head">
         <h1 className="head-title">{TABS.find((entry) => entry.id === tab)?.label}</h1>

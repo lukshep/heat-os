@@ -5,9 +5,9 @@ import type { Candidate } from '../heat/suggest';
 import { isScheduledOn, warmthAt, type WarmthState } from '../heat/warmth';
 import type { AppState, Area, Completion, ID, Routine, Settings, Task } from './model';
 
-/** The HEAT config in force: the tuned defaults, with the person's own line and day start. */
+/** The HEAT config in force: the tuned defaults, with the person's own day start. */
 export function heatConfig(settings: Settings): HeatConfig {
-  return { ...DEFAULT_CONFIG, threshold: settings.threshold, dayStartHour: settings.dayStartHour };
+  return { ...DEFAULT_CONFIG, dayStartHour: settings.dayStartHour };
 }
 
 /** The completion log as the engine should see it: undone completions left out. */

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { DEFAULT_CONFIG, MAX_HEAT, type HeatConfig } from '../heat/config';
+import { DEFAULT_CONFIG, FULL_HEAT, MAX_HEAT, type HeatConfig } from '../heat/config';
 import { SCENARIOS, simDayOf, simulate, type Scenario, type SimResult } from '../heat/sim';
 import { HeatChart } from './HeatChart';
 import './dev.css';
@@ -36,14 +36,17 @@ const SCENARIO_FIELDS: ScenarioField[] = [
   { key: 'toHour', label: 'To hour', min: 0, max: 23 },
 ];
 
+/** The daily peak a consistent, balanced day is meant to settle at. */
+const BALANCED_PEAK = 85;
+
 /**
- * Points a day that lift HEAT back to the threshold after a day's cooling from it:
- * the size of the day that just holds the line, which is what the gain scale really sets.
+ * Points a day that hold HEAT at a given daily peak: enough to climb back to it after a
+ * day's cooling. This is what the gain scale really sets.
  */
-function pointsToHoldLine(config: HeatConfig): number {
-  const gapAtLine = MAX_HEAT - config.threshold;
-  const gapAfterCooling = MAX_HEAT - config.threshold * config.dailyRetention;
-  return gapAtLine > 0 ? config.gainScale * Math.log(gapAfterCooling / gapAtLine) : 0;
+function pointsToHold(peak: number, config: HeatConfig): number {
+  const gapAtPeak = MAX_HEAT - peak;
+  const gapAfterCooling = MAX_HEAT - peak * config.dailyRetention;
+  return gapAtPeak > 0 ? config.gainScale * Math.log(gapAfterCooling / gapAtPeak) : 0;
 }
 
 /** Share of warmth lost to the first, second and third miss in a row. */
@@ -52,7 +55,6 @@ function missShares(missStep: number): string {
 }
 
 const CONFIG_FIELDS: ConfigField[] = [
-  { key: 'threshold', label: 'Threshold', min: 0, max: 100, step: 1 },
   {
     key: 'dailyRetention',
     label: 'Daily retention',
@@ -62,20 +64,41 @@ const CONFIG_FIELDS: ConfigField[] = [
     describe: (value) => `${Math.round((1 - value) * 100)}% cooling a day`,
   },
   {
+    key: 'surgeRetention',
+    label: 'Retention in Surge',
+    min: 0.5,
+    max: 1,
+    step: 0.01,
+    describe: (value) => `${Math.round((1 - value) * 100)}% cooling a day above ${FULL_HEAT}`,
+  },
+  {
     key: 'gainScale',
     label: 'Gain scale',
     min: 50,
     max: 600,
     step: 5,
-    describe: (_value, config) => `${Math.round(pointsToHoldLine(config))} points holds the line`,
+    describe: (_value, config) => `${Math.round(pointsToHold(BALANCED_PEAK, config))} points a day holds ${BALANCED_PEAK}`,
   },
   { key: 'basePoints', label: 'Base points', min: 1, max: 30, step: 1 },
   { key: 'firstInAreaBonus', label: 'First-in-area bonus', min: 0, max: 2, step: 0.05 },
   { key: 'areaBonusDecay', label: 'Bonus kept per further area', min: 0, max: 1, step: 0.05 },
   { key: 'repeatDecay', label: 'Kept per further task in area', min: 0, max: 0.95, step: 0.05 },
-  { key: 'importantBonus', label: 'Important bonus', min: 0, max: 2, step: 0.05 },
-  { key: 'avoidedBonus', label: 'Avoided bonus', min: 0, max: 2, step: 0.05 },
-  { key: 'flagDecay', label: 'Flag bonus kept per further flag', min: 0, max: 1, step: 0.05 },
+  {
+    key: 'importantBonus',
+    label: 'Important, flat extra',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    describe: (value, config) => `${(value * config.basePoints).toFixed(1)} points, never diminished`,
+  },
+  {
+    key: 'avoidedBonus',
+    label: 'Avoided, flat extra',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    describe: (value, config) => `${(value * config.basePoints).toFixed(1)} points, never diminished`,
+  },
   { key: 'warmthBonus', label: 'Full-warmth bonus', min: 0, max: 3, step: 0.1 },
   { key: 'warmthStep', label: 'Warmth gap closed per completion', min: 0.05, max: 1, step: 0.05 },
   {
@@ -145,8 +168,7 @@ function describeStats(result: SimResult) {
   return {
     peak: stats.settledPeak.toFixed(1),
     low: stats.settledLow.toFixed(1),
-    atLine: `${Math.round(stats.daysAtLine * 100)}%`,
-    reaches: stats.reachesLineOnDay === null ? 'Never' : `Day ${stats.reachesLineOnDay.toFixed(1)}`,
+    surge: `${Math.round(stats.surgeShare * 100)}%`,
     points: stats.pointsPerActiveDay.toFixed(1),
     warmth: stats.routineWarmth === null ? null : stats.routineWarmth.toFixed(2),
   };
@@ -250,15 +272,14 @@ export default function DevPanel() {
         <div className="dev-results">
           <section className="dev-stats" aria-label="Summary">
             <Stat label="Settled peak" value={now.peak} was={before?.peak} />
-            <Stat label="Days reaching the line" value={now.atLine} was={before?.atLine} />
-            <Stat label="First reaches the line" value={now.reaches} was={before?.reaches} />
             <Stat label="Settled low" value={now.low} was={before?.low} />
+            <Stat label="Time in Surge" value={now.surge} was={before?.surge} />
             <Stat label="Points per active day" value={now.points} was={before?.points} />
             {now.warmth !== null && <Stat label="Routine warmth" value={now.warmth} was={before?.warmth ?? undefined} />}
           </section>
           <p className="dev-caption">
-            Settled figures cover the final on/off cycle of the run, once the starting climb no longer matters. A day
-            reaches the line if HEAT touches the threshold at any point in it.
+            Settled figures cover the final on/off cycle of the run, once the starting climb no longer matters. Surge
+            is any time spent above a full gauge of {FULL_HEAT}.
           </p>
 
           <section className="dev-card" aria-label="HEAT over time">
@@ -278,15 +299,15 @@ export default function DevPanel() {
                   </>
                 )}
                 <li>
-                  <span className="chart-key is-threshold" />
-                  Threshold
+                  <span className="chart-key is-surge" />
+                  Surge starts
                 </li>
               </ul>
             </div>
             <HeatChart
               samples={result.samples}
               baseline={baseline?.samples ?? null}
-              threshold={config.threshold}
+              surgeAt={FULL_HEAT}
               days={days}
             />
             <details className="dev-details">

@@ -1,4 +1,4 @@
-import type { HeatConfig } from './config';
+import { FULL_HEAT, type HeatConfig } from './config';
 import { addDays, dayKeyAt, DAY_MS, HOUR_MS, type DayKey } from './day';
 import { traceHeat, type CompletionFact, type ScoredCompletion } from './engine';
 import { warmthAt, type Schedule, type WarmthBase } from './warmth';
@@ -36,10 +36,8 @@ export interface SimStats {
   /** Highest and lowest HEAT across the final full on/off cycle. */
   settledPeak: number;
   settledLow: number;
-  /** Share of the days in that final cycle on which HEAT reached the threshold at some point. */
-  daysAtLine: number;
-  /** When HEAT first reaches the threshold, in days from the start; null if it never does. */
-  reachesLineOnDay: number | null;
+  /** Share of that final cycle spent in Surge, above a full gauge. */
+  surgeShare: number;
   pointsPerActiveDay: number;
   /** Warmth of the first routine at the end of the run; null when the scenario has none. */
   routineWarmth: number | null;
@@ -178,23 +176,21 @@ export function simulate(scenario: Scenario, config: HeatConfig, days: number): 
 
   const cycle = Math.max(1, wholeNumber(scenario.daysOn) + wholeNumber(scenario.daysOff));
   const settledFrom = Math.max(0, totalDays - cycle);
-  const dayPeaks = new Array<number>(totalDays).fill(0);
   let settledPeak = 0;
   let settledLow = Number.POSITIVE_INFINITY;
-  let reachesLineOnDay: number | null = null;
+  let surgeDays = 0;
 
-  for (const sample of samples) {
-    if (reachesLineOnDay === null && sample.heat >= config.threshold) reachesLineOnDay = sample.day;
-    const day = Math.floor(sample.day);
-    if (day < totalDays) dayPeaks[day] = Math.max(dayPeaks[day] ?? 0, sample.heat);
-    if (sample.day < settledFrom) continue;
+  for (let index = 0; index < samples.length; index++) {
+    const sample = samples[index];
+    if (!sample || sample.day < settledFrom) continue;
     settledPeak = Math.max(settledPeak, sample.heat);
     settledLow = Math.min(settledLow, sample.heat);
+    const following = samples[index + 1];
+    if (following) surgeDays += daysInSurge(sample.heat, following.day - sample.day, config);
   }
 
-  const settledDays = dayPeaks.slice(settledFrom);
-  const daysAtLine = settledDays.filter((peak) => peak >= config.threshold).length;
   const points = trace.scored.reduce((sum, entry) => sum + entry.points, 0);
+  const settledDays = totalDays - settledFrom;
 
   return {
     samples,
@@ -202,12 +198,19 @@ export function simulate(scenario: Scenario, config: HeatConfig, days: number): 
     stats: {
       settledPeak,
       settledLow: Number.isFinite(settledLow) ? settledLow : 0,
-      daysAtLine: settledDays.length > 0 ? daysAtLine / settledDays.length : 0,
-      reachesLineOnDay,
+      surgeShare: settledDays > 0 ? surgeDays / settledDays : 0,
       pointsPerActiveDay: run.activeDays > 0 ? points / run.activeDays : 0,
       routineWarmth: run.routineWarmth,
     },
   };
+}
+
+/** Days out of `spanDays` spent above a full gauge while cooling from `heat` with no activity. */
+function daysInSurge(heat: number, spanDays: number, config: HeatConfig): number {
+  if (heat <= FULL_HEAT) return 0;
+  if (config.surgeRetention >= 1) return spanDays;
+  if (config.surgeRetention <= 0) return 0;
+  return Math.min(spanDays, Math.log(FULL_HEAT / heat) / Math.log(config.surgeRetention));
 }
 
 const EVERY_DAY_ON = { daysOn: 1, daysOff: 0 };
@@ -219,38 +222,38 @@ const THROUGH_THE_DAY = { fromHour: 8, toHour: 20 };
 /** Behaviours worth checking after every change to the numbers. */
 export const SCENARIOS: readonly [Scenario, ...Scenario[]] = [
   {
-    name: 'Maintenance day',
-    note: 'Two tasks in each of four areas, every day. This should just reach the line.',
+    name: 'Balanced day',
+    note: 'Two tasks in each of four areas, every day. Consistent, balanced activity should sit at about 70 to 85.',
     ...EVERY_DAY_ON, areas: 4, tasks: 8, ...NO_FLAGS, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
-    name: 'Three areas, three tasks each',
-    note: 'Nine tasks across three areas, every day. Fewer areas, more depth: also just reaches the line.',
-    ...EVERY_DAY_ON, areas: 3, tasks: 9, ...NO_FLAGS, ...NO_ROUTINES, ...ONE_SITTING,
-  },
-  {
-    name: 'Big day',
-    note: 'Three tasks in each of four areas, one Important, every day. Comfortably over the line.',
-    ...EVERY_DAY_ON, areas: 4, tasks: 12, important: 1, avoided: 0, ...NO_ROUTINES, ...ONE_SITTING,
+    name: 'Balanced day, two flagged',
+    note: 'The balanced day with one task Important and one Avoided. Flags should lift it noticeably.',
+    ...EVERY_DAY_ON, areas: 4, tasks: 8, important: 1, avoided: 1, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Light day',
-    note: 'Two tasks in each of three areas, every day. A real day, but short of the line.',
+    note: 'Two tasks in each of three areas, every day. Lower than a balanced day, but not punished.',
     ...EVERY_DAY_ON, areas: 3, tasks: 6, ...NO_FLAGS, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
+    name: 'Big day',
+    note: 'Three tasks in each of four areas, two flagged, every day. High, but still short of a full gauge.',
+    ...EVERY_DAY_ON, areas: 4, tasks: 12, important: 1, avoided: 1, ...NO_ROUTINES, ...ONE_SITTING,
+  },
+  {
+    name: 'Huge day',
+    note: 'Three daily routines plus twelve tasks, four flagged, every day. This is what Surge takes.',
+    ...EVERY_DAY_ON, areas: 4, tasks: 12, important: 2, avoided: 2, routines: 3, skipRoutinesEvery: 0, ...ONE_SITTING,
+  },
+  {
     name: 'One task per area',
-    note: 'One task in each of five areas, every day. Breadth alone should fall short.',
+    note: 'One task in each of five areas, every day. Breadth with no depth.',
     ...EVERY_DAY_ON, areas: 5, tasks: 5, ...NO_FLAGS, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
-    name: 'Breadth farmer',
-    note: 'One trivial task in each of six areas, every day. The cheapest way to score: how close does it get?',
-    ...EVERY_DAY_ON, areas: 6, tasks: 6, ...NO_FLAGS, ...NO_ROUTINES, ...ONE_SITTING,
-  },
-  {
     name: 'One-area grind',
-    note: 'Five tasks a day, all in one area. Volume without balance should stay well under the line.',
+    note: 'Five tasks a day, all in one area. Volume without balance should sit well below a balanced day.',
     ...EVERY_DAY_ON, areas: 1, tasks: 5, ...NO_FLAGS, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
@@ -260,27 +263,27 @@ export const SCENARIOS: readonly [Scenario, ...Scenario[]] = [
   },
   {
     name: 'Flag everything',
-    note: 'The maintenance day with every task marked Important and Avoided. Shows what flag inflation buys.',
+    note: 'The balanced day with every task marked Important and Avoided. Flags are never diminished, so this is the easy way into Surge.',
     ...EVERY_DAY_ON, areas: 4, tasks: 8, important: 8, avoided: 8, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Weekend warrior',
     note: 'Two big days, then five days of nothing. Bursts should not stand in for consistency.',
-    daysOn: 2, daysOff: 5, areas: 4, tasks: 12, important: 1, avoided: 0, ...NO_ROUTINES, ...ONE_SITTING,
+    daysOn: 2, daysOff: 5, areas: 4, tasks: 12, important: 1, avoided: 1, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Week off',
-    note: 'Two weeks of big days, then a week away. Watch how long HEAT takes to come back.',
-    daysOn: 14, daysOff: 7, areas: 4, tasks: 12, important: 1, avoided: 0, ...NO_ROUTINES, ...ONE_SITTING,
+    note: 'Two weeks of balanced days, then a week away. Watch how far HEAT falls and how fast it comes back.',
+    daysOn: 14, daysOff: 7, areas: 4, tasks: 8, ...NO_FLAGS, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Routines, kept',
-    note: 'Three daily routines plus three tasks. Under the line while the routines are new, over it once they are warm.',
+    note: 'Three daily routines plus three tasks. The same effort is worth more as the routines warm.',
     ...EVERY_DAY_ON, areas: 3, tasks: 3, ...NO_FLAGS, routines: 3, skipRoutinesEvery: 0, ...THROUGH_THE_DAY,
   },
   {
     name: 'Routines, patchy',
-    note: 'The same, but the routines are skipped every third day. The lost warmth should keep it under the line.',
+    note: 'The same, but the routines are skipped every third day. Lost warmth and lost days pull it down.',
     ...EVERY_DAY_ON, areas: 3, tasks: 3, ...NO_FLAGS, routines: 3, skipRoutinesEvery: 3, ...THROUGH_THE_DAY,
   },
 ];

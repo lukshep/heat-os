@@ -123,9 +123,15 @@ function isCollection(value: unknown, shape: Record<string, Check>): boolean {
 function migrate(raw: Dict): Dict | null {
   let document = raw;
 
-  // Version 2 added settings. Before it, the line and the day start were fixed.
+  // Version 2 added settings: a line to reach each day, and the hour the day starts.
   if (document.schemaVersion === 1) {
-    document = { ...document, schemaVersion: 2, settings: DEFAULT_SETTINGS };
+    document = { ...document, schemaVersion: 2, settings: { threshold: 60, ...DEFAULT_SETTINGS } };
+  }
+
+  // Version 3 dropped the line, so the threshold goes and only the day start is kept.
+  if (document.schemaVersion === 2) {
+    const settings = isDict(document.settings) ? { dayStartHour: document.settings.dayStartHour } : document.settings;
+    document = { ...document, schemaVersion: 3, settings };
   }
 
   return document.schemaVersion === SCHEMA_VERSION ? document : null;
@@ -149,9 +155,9 @@ export function parseState(raw: unknown): AppState | null {
   if (!Array.isArray(deferred.taskIds) || !deferred.taskIds.every(isString)) return null;
 
   const settings = current.settings;
-  if (!isDict(settings) || !isNumber(settings.threshold) || !isNumber(settings.dayStartHour)) return null;
+  if (!isDict(settings) || !isNumber(settings.dayStartHour)) return null;
 
-  // A hand-edited backup could ask for a line off the end of the bar; pull such values back in.
+  // A hand-edited backup could ask for a day that starts at an impossible hour; pull it back in.
   return { ...current, settings: normalizeSettings(settings) } as unknown as AppState;
 }
 

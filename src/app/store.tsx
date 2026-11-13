@@ -58,14 +58,14 @@ export interface Actions {
   deleteProject(id: ID): void;
   /** Sets a task aside from Today's suggestions for the rest of the day. */
   deferToday(taskId: ID): void;
-  /** Moves the line or the start of the day. */
+  /** Moves the start of the day. */
   updateSettings(patch: Partial<Settings>): void;
   replaceState(state: AppState): void;
 }
 
 export function createActions(store: AppStore): Actions {
   const newId = (): ID => crypto.randomUUID();
-  // Read afresh each time: the line and the day start are settings and can change.
+  // Read afresh each time: the day start is a setting and can change.
   const config = () => heatConfig(store.getState().settings);
   const dayOf = (at: number) => localDayKey(at, config().dayStartHour);
 

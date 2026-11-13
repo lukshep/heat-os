@@ -57,7 +57,7 @@ export type Action =
   /** Removes a project. Whatever was in it moves up one level. */
   | { type: 'project/delete'; id: ID; at: number }
   | { type: 'today/defer'; dayKey: DayKey; taskId: ID }
-  /** Changes where the line sits or when the day starts. Values are kept on a step and inside their limits. */
+  /** Changes when the day starts. The value is kept on a step and inside its limits. */
   | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'state/replace'; state: AppState };
 
@@ -405,9 +405,7 @@ export function reduce(state: AppState, action: Action): AppState {
 
     case 'settings/update': {
       const settings = normalizeSettings({ ...state.settings, ...action.patch });
-      const unchanged =
-        settings.threshold === state.settings.threshold && settings.dayStartHour === state.settings.dayStartHour;
-      return unchanged ? state : { ...state, settings };
+      return settings.dayStartHour === state.settings.dayStartHour ? state : { ...state, settings };
     }
 
     case 'state/replace':

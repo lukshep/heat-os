@@ -6,15 +6,16 @@ interface Props {
   samples: readonly SimSample[];
   /** The same scenario under the default config, drawn for comparison when the config has been changed. */
   baseline: readonly SimSample[] | null;
-  threshold: number;
+  /** Where a full gauge sits. Anything drawn above it is Surge. */
+  surgeAt: number;
   days: number;
 }
 
 const HEIGHT = 300;
 const MARGIN = { top: 16, right: 44, bottom: 42, left: 36 };
 const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
-const Y_TICKS = [0, 25, 50, 75, 100];
-/** A regular tick label this close to the threshold's own label is dropped rather than overlapped. */
+const Y_TICKS = [0, 25, 50, 75, 100, 120];
+/** A regular tick label this close to the full-gauge label is dropped rather than overlapped. */
 const TICK_CLEARANCE = 6;
 const X_STEPS = [1, 2, 7, 14, 28, 56, 91, 182];
 
@@ -71,7 +72,7 @@ function formatMoment(day: number): string {
   return `Day ${Math.floor(minutes / 1440)}, ${hour}:${minute}`;
 }
 
-export function HeatChart({ samples, baseline, threshold, days }: Props) {
+export function HeatChart({ samples, baseline, surgeAt, days }: Props) {
   const [ref, width] = useWidth();
   const [active, setActive] = useState<number | null>(null);
 
@@ -145,7 +146,7 @@ export function HeatChart({ samples, baseline, threshold, days }: Props) {
                 y1={yFor(tick)}
                 y2={yFor(tick)}
               />
-              {Math.abs(tick - threshold) >= TICK_CLEARANCE && (
+              {Math.abs(tick - surgeAt) >= TICK_CLEARANCE && (
                 <text className="chart-tick" x={MARGIN.left - 8} y={yFor(tick)} textAnchor="end" dominantBaseline="middle">
                   {tick}
                 </text>
@@ -163,20 +164,20 @@ export function HeatChart({ samples, baseline, threshold, days }: Props) {
           </text>
 
           <line
-            className="chart-threshold"
+            className="chart-surge"
             x1={MARGIN.left}
             x2={MARGIN.left + plotWidth}
-            y1={yFor(threshold)}
-            y2={yFor(threshold)}
+            y1={yFor(surgeAt)}
+            y2={yFor(surgeAt)}
           />
           <text
-            className="chart-tick is-threshold"
+            className="chart-tick is-surge"
             x={MARGIN.left - 8}
-            y={yFor(threshold)}
+            y={yFor(surgeAt)}
             textAnchor="end"
             dominantBaseline="middle"
           >
-            {threshold}
+            {surgeAt}
           </text>
 
           {baselinePath && <path className="chart-line is-compare" d={baselinePath} />}

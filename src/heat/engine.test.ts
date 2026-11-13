@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_HEAT } from './config';
+import { FULL_HEAT, MAX_HEAT } from './config';
 import { DAY_MS, HOUR_MS } from './day';
 import {
   afterCompleting,
   applyGain,
   areaFactor,
   cool,
+  flagPoints,
   foldHeat,
   gainFor,
   pointsFor,
-  quality,
   traceHeat,
+  warmthFactor,
   type CompletionFact,
   type DayPosition,
   type HeatState,
@@ -22,11 +23,11 @@ const DAY_1 = '2026-01-05';
 const DAY_2 = '2026-01-06';
 const T0 = Date.UTC(2026, 0, 5, 12);
 
-/** HEAT after one 20-point completion from cold: 100 * (1 - e^-0.2). */
-const FIRST_TASK = 18.127;
+/** HEAT after one 20-point completion from cold: 120 * (1 - e^-0.2). */
+const FIRST_TASK = 21.752;
 
 const plain: Scorable = { areaId: 'work', important: false, avoided: false, warmth: 0 };
-const start: DayPosition = { inArea: 0, areasOpened: 0, flagged: 0 };
+const start: DayPosition = { inArea: 0, areasOpened: 0 };
 
 let sequence = 0;
 function fact(overrides: Partial<CompletionFact> = {}): CompletionFact {
@@ -47,7 +48,7 @@ function pointsOf(log: CompletionFact[]): number[] {
   return traceHeat(log, config, [last]).scored.map((entry) => Math.round(entry.points * 1000) / 1000);
 }
 
-const empty: HeatState = { heat: 0, now: T0, today: DAY_1, areaCounts: {}, flaggedToday: 0 };
+const empty: HeatState = { heat: 0, now: T0, today: DAY_1, areaCounts: {} };
 
 describe('cool', () => {
   it('loses 20% in 24 hours', () => {
@@ -63,6 +64,42 @@ describe('cool', () => {
   it('leaves HEAT alone when no time has passed', () => {
     expect(cool(73, 0, config)).toBe(73);
     expect(cool(73, -5000, config)).toBe(73);
+  });
+});
+
+describe('cooling in Surge', () => {
+  it('is slower above a full gauge', () => {
+    // 110 at the Surge rate of 10% a day is still above 100 after half a day.
+    expect(cool(110, DAY_MS / 2, config)).toBeCloseTo(110 * Math.sqrt(0.9), 10);
+    expect(cool(110, DAY_MS / 2, config)).toBeGreaterThan(110 * Math.sqrt(0.8));
+  });
+
+  it('goes back to the ordinary rate once it is down to full', () => {
+    const daysToFull = Math.log(FULL_HEAT / 110) / Math.log(0.9);
+    expect(cool(110, daysToFull * DAY_MS, config)).toBeCloseTo(FULL_HEAT, 8);
+    expect(cool(110, (daysToFull + 1) * DAY_MS, config)).toBeCloseTo(80, 8);
+  });
+
+  it('has no step where the two rates meet', () => {
+    const justAbove = cool(100.0001, HOUR_MS, config);
+    const justBelow = cool(99.9999, HOUR_MS, config);
+    expect(justAbove - justBelow).toBeLessThan(0.001);
+    expect(justAbove).toBeGreaterThan(justBelow);
+  });
+
+  it('is continuous across the boundary: two steps equal one', () => {
+    const twoSteps = cool(cool(112, 20 * HOUR_MS, config), 30 * HOUR_MS, config);
+    expect(twoSteps).toBeCloseTo(cool(112, 50 * HOUR_MS, config), 8);
+  });
+
+  it('always cools, and never below where plain cooling from full would be', () => {
+    let previous = 118;
+    for (let hours = 1; hours <= 72; hours++) {
+      const level = cool(118, hours * HOUR_MS, config);
+      expect(level).toBeLessThan(previous);
+      previous = level;
+    }
+    expect(cool(118, 3 * DAY_MS, config)).toBeGreaterThan(cool(100, 3 * DAY_MS, config));
   });
 });
 
@@ -94,42 +131,46 @@ describe('areaFactor', () => {
   });
 });
 
-describe('quality', () => {
-  it('adds flag and warmth bonuses rather than compounding them', () => {
-    expect(quality(plain, start, config)).toBe(1);
-    expect(quality({ ...plain, important: true }, start, config)).toBe(1.5);
-    expect(quality({ ...plain, important: true, avoided: true }, start, config)).toBe(2);
-    expect(quality({ ...plain, warmth: 1 }, start, config)).toBe(2);
-    expect(quality({ ...plain, important: true, avoided: true, warmth: 1 }, start, config)).toBe(3);
+describe('warmth and flags', () => {
+  it('multiplies a routine by its warmth, clamped to 0-1', () => {
+    expect(warmthFactor(plain, config)).toBe(1);
+    expect(warmthFactor({ ...plain, warmth: 0.5 }, config)).toBe(1.5);
+    expect(warmthFactor({ ...plain, warmth: 1 }, config)).toBe(2);
+    expect(warmthFactor({ ...plain, warmth: 5 }, config)).toBe(2);
+    expect(warmthFactor({ ...plain, warmth: -1 }, config)).toBe(1);
   });
 
-  it('halves the flag bonus for each flagged completion already logged today', () => {
-    const flagged: Scorable = { ...plain, important: true, avoided: true };
-    expect(quality(flagged, { ...start, flagged: 1 }, config)).toBe(1.5);
-    expect(quality(flagged, { ...start, flagged: 2 }, config)).toBe(1.25);
-    expect(quality({ ...plain, important: true }, { ...start, flagged: 1 }, config)).toBe(1.25);
-  });
-
-  it('leaves unflagged items and warmth untouched by earlier flags', () => {
-    expect(quality(plain, { ...start, flagged: 5 }, config)).toBe(1);
-    expect(quality({ ...plain, warmth: 1 }, { ...start, flagged: 5 }, config)).toBe(2);
-  });
-
-  it('clamps warmth to the 0-1 range', () => {
-    expect(quality({ ...plain, warmth: 5 }, start, config)).toBe(2);
-    expect(quality({ ...plain, warmth: -1 }, start, config)).toBe(1);
+  it('adds flat points for each flag', () => {
+    expect(flagPoints(plain, config)).toBe(0);
+    expect(flagPoints({ ...plain, important: true }, config)).toBe(5);
+    expect(flagPoints({ ...plain, avoided: true }, config)).toBe(5);
+    expect(flagPoints({ ...plain, important: true, avoided: true }, config)).toBe(10);
   });
 });
 
 describe('pointsFor', () => {
-  it('combines area position and quality', () => {
+  it('combines area position, warmth and flags', () => {
     expect(pointsFor(plain, start, config)).toBe(20);
     expect(pointsFor(plain, { ...start, inArea: 1 }, config)).toBe(5);
-    expect(pointsFor({ ...plain, important: true }, start, config)).toBe(30);
+    expect(pointsFor({ ...plain, warmth: 1 }, start, config)).toBe(40);
+    expect(pointsFor({ ...plain, important: true }, start, config)).toBe(25);
     expect(pointsFor({ ...plain, areaId: null }, start, config)).toBe(10);
   });
 
-  it('caps what one area can yield in a day', () => {
+  it('pays a flag in full however many tasks the area has already had', () => {
+    const flagged: Scorable = { ...plain, important: true, avoided: true };
+    for (const inArea of [0, 1, 4, 20]) {
+      const position = { ...start, inArea };
+      expect(pointsFor(flagged, position, config) - pointsFor(plain, position, config)).toBeCloseTo(10, 10);
+    }
+  });
+
+  it('does not scale a flag with warmth', () => {
+    const warm: Scorable = { ...plain, warmth: 1 };
+    expect(pointsFor({ ...warm, important: true }, start, config) - pointsFor(warm, start, config)).toBe(5);
+  });
+
+  it('caps what plain tasks in one area can yield in a day', () => {
     let total = 0;
     for (let inArea = 0; inArea < 500; inArea++) total += pointsFor(plain, { ...start, inArea }, config);
     const ceiling = config.basePoints * (1 / (1 - config.repeatDecay) + config.firstInAreaBonus);
@@ -138,9 +179,9 @@ describe('pointsFor', () => {
 });
 
 describe('applyGain', () => {
-  it('closes a share of the gap to the maximum', () => {
+  it('closes a share of the gap to the ceiling', () => {
     expect(applyGain(0, 20, config)).toBeCloseTo(FIRST_TASK, 3);
-    expect(applyGain(50, 20, config)).toBeCloseTo(50 + FIRST_TASK / 2, 3);
+    expect(applyGain(60, 20, config)).toBeCloseTo(60 + FIRST_TASK / 2, 3);
   });
 
   it('adds less the hotter it already is', () => {
@@ -153,9 +194,10 @@ describe('applyGain', () => {
     }
   });
 
-  it('never passes the maximum', () => {
+  it('can pass a full gauge but never the ceiling', () => {
+    expect(applyGain(95, 100, config)).toBeGreaterThan(FULL_HEAT);
     expect(applyGain(0, 1e9, config)).toBeLessThanOrEqual(MAX_HEAT);
-    expect(applyGain(99.9, 1e9, config)).toBeLessThanOrEqual(MAX_HEAT);
+    expect(applyGain(119.9, 1e9, config)).toBeLessThanOrEqual(MAX_HEAT);
     expect(applyGain(MAX_HEAT, 50, config)).toBe(MAX_HEAT);
   });
 
@@ -184,23 +226,14 @@ describe('scoring a day', () => {
     expect(pointsOf(log)).toEqual([10, 20]);
   });
 
-  it('pays a smaller flag bonus for each further flagged completion', () => {
+  it('pays every flag in full, however many have been used today', () => {
     const log = [
       fact({ areaId: 'work', important: true }),
-      fact({ areaId: 'health', important: true, at: T0 + HOUR_MS }),
-      fact({ areaId: 'home', important: true, avoided: true, at: T0 + 2 * HOUR_MS }),
+      fact({ areaId: 'work', important: true, at: T0 + HOUR_MS }),
+      fact({ areaId: 'work', important: true, avoided: true, at: T0 + 2 * HOUR_MS }),
       fact({ areaId: 'work', at: T0 + 3 * HOUR_MS }),
     ];
-    expect(pointsOf(log)).toEqual([30, 18.75, 15.625, 5]);
-  });
-
-  it('starts area and flag positions afresh each day', () => {
-    const log = [
-      fact({ areaId: 'work', important: true }),
-      fact({ areaId: 'health', important: true, at: T0 + HOUR_MS }),
-      fact({ areaId: 'health', important: true, at: T0 + DAY_MS, dayKey: DAY_2 }),
-    ];
-    expect(pointsOf(log)).toEqual([30, 18.75, 30]);
+    expect(pointsOf(log)).toEqual([25, 10, 12.5, 1.25]);
   });
 });
 
@@ -255,7 +288,7 @@ describe('foldHeat', () => {
   it("reports only today's position", () => {
     const later = { at: T0 + DAY_MS, dayKey: DAY_2 };
     const log = [
-      fact({ important: true }),
+      fact(),
       fact(later),
       fact({ ...later, avoided: true }),
       fact({ ...later, areaId: 'health' }),
@@ -263,7 +296,15 @@ describe('foldHeat', () => {
     ];
     const state = foldHeat(log, config, T0 + DAY_MS, DAY_2);
     expect(state.areaCounts).toEqual({ work: 2, health: 1, '': 1 });
-    expect(state.flaggedToday).toBe(1);
+  });
+
+  it('can carry HEAT past a full gauge', () => {
+    const log = Array.from({ length: 12 }, (_, index) =>
+      fact({ areaId: `area-${index}`, important: true, avoided: true, warmth: 1, kind: 'routine' }),
+    );
+    const heat = foldHeat(log, config, T0, DAY_1).heat;
+    expect(heat).toBeGreaterThan(FULL_HEAT);
+    expect(heat).toBeLessThan(MAX_HEAT);
   });
 });
 
@@ -286,11 +327,10 @@ describe('pricing the next completion', () => {
     expect(gainFor(state, { ...plain, areaId: 'health' }, config)).toBeGreaterThan(gainFor(state, plain, config));
   });
 
-  it('prices a flagged item lower once flags have been used today', () => {
+  it('keeps a flagged item worth doing deep into a worked area', () => {
+    const worked: HeatState = { ...empty, heat: 50, areaCounts: { work: 6 } };
     const flagged: Scorable = { ...plain, important: true };
-    const used: HeatState = { ...empty, flaggedToday: 2 };
-    expect(gainFor(used, flagged, config)).toBeLessThan(gainFor(empty, flagged, config));
-    expect(gainFor(used, flagged, config)).toBeGreaterThan(gainFor(used, plain, config));
+    expect(gainFor(worked, flagged, config)).toBeGreaterThan(10 * gainFor(worked, plain, config));
   });
 
   it('agrees with replaying the log', () => {
@@ -304,7 +344,6 @@ describe('pricing the next completion', () => {
 
     expect(predicted.heat).toBeCloseTo(replayed.heat, 10);
     expect(predicted.areaCounts).toEqual(replayed.areaCounts);
-    expect(predicted.flaggedToday).toBe(replayed.flaggedToday);
     expect(gainFor(before, item, config)).toBeCloseTo(replayed.heat - before.heat, 10);
   });
 });

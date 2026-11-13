@@ -16,9 +16,12 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M5 | Nested projects | Deployed 2026-11-12; not yet tried on an iPhone |
 | M6 | Polish | Deployed 2026-11-12; not yet tried on an iPhone |
 | M7 | Edge meter | Deployed 2026-11-12; tried on an iPhone, corners judged good |
-| M8 | Neutral look and icon tab bar | Built 2026-11-12; not yet deployed |
+| M8 | Neutral look and icon tab bar | Deployed 2026-11-12 |
+| M9 | Surge: no line, a gauge to 120 | Built 2026-11-12; not yet deployed |
 
 The first prototype is M1–M3.
+
+M9 changed the product: there is no longer a line to reach. Sections M1 to M8 below describe what was built at the time, so they still mention the line, the threshold and its mark. M9 says what replaced them, and `docs/SPEC.md` describes the app as it is now.
 
 ### M0 — Scaffold
 
@@ -218,6 +221,66 @@ Asked for after seeing the edge meter on the phone.
 
 Verified on a production build in a desktop browser at phone size. Not yet seen on an iPhone; the inset change in particular is a guess from a description.
 
+### M9 — Surge
+
+Asked for after M8. The line to reach each day is gone, and with it any daily success or failure. HEAT is a gauge of recent activity and consistency, and it can now pass 100.
+
+What changed in the rules:
+
+- **No threshold.** The setting, the mark on the edge, its glow when reached, and every "reaches the line" figure in the simulator and the tests are removed.
+- **Surge.** HEAT runs to 120. Gains aim at 120 instead of 100, which is what lets a big enough day pass 100. Above 100 HEAT cools at 15% a day instead of 20%, so the overflow lasts: a buffer of momentum that fades in about a day.
+- **Flags are flat and undiminished.** Important and Avoided each add 7.5 points, on top of whatever the task is otherwise worth. The rule that halved the bonus with each flagged completion is gone, and the area's diminishing returns no longer touch it.
+- **Retuned so balanced activity sits at about 70 to 85.** Two tasks in each of four areas, every day, moves between 68 and 85. Filling the gauge from there takes about 206 points in a day.
+
+What changed on screen:
+
+- **The edge line** has no mark. Above 100 it thickens, pales towards a bright pale yellow, glows wider, and a band of light travels round it. The tip is hidden in Surge.
+- **Settings** lost "The line". The day start and the backup remain.
+- **Row colours** needed no new code: they already map what each item would add right now, so they follow the new rules. Flagged items now stay warmer than plain ones all day, because their bonus no longer shrinks.
+- **The simulator** shows time in Surge in place of days reaching the line, has a slider for cooling in Surge, and draws the chart to 120.
+
+Saved data: the format is now version 3, which drops the threshold from settings. Version 1 and 2 documents are upgraded on load.
+
+What the presets show:
+
+| Preset | Settled peak | Settled low | Time in Surge |
+|---|---|---|---|
+| Balanced day (two tasks in each of four areas) | 84.8 | 67.9 | 0% |
+| Balanced day, two flagged | 89.6 | 71.7 | 0% |
+| Light day (two tasks in each of three areas) | 76.6 | 61.3 | 0% |
+| Big day (three tasks in each of four areas, two flagged) | 95.8 | 76.6 | 0% |
+| Huge day (big day, four flags, three warm routines) | 107.2 | 88.0 | 43% |
+| One task per area (five areas) | 76.0 | 60.8 | 0% |
+| One-area grind | 59.5 | 47.6 | 0% |
+| Task splitter | 70.8 | 56.7 | 0% |
+| Flag everything | 108.0 | 88.9 | 47% |
+| Weekend warrior | 82.0 | 21.5 | 0% |
+| Week off | 84.8 | 14.2 | 0% |
+| Routines, kept | 87.0 | 76.2 | 0% |
+| Routines, patchy | 80.0 | 68.4 | 0% |
+
+The scenario invariants in `src/heat/scenarios.test.ts` were rewritten for this and replace the list under M1:
+
+- consistent, balanced activity peaks between 80 and 90 and never fills the gauge
+- two balanced days of work in one day is still not a full gauge; a huge day, kept up, surges, but not permanently
+- HEAT stays within 0–120 under any amount of farming
+- Surge holds its heat longer than ordinary cooling would
+- a day of rest leaves HEAT above 65, two leave it above 50, and a week away is made up within three balanced days
+- a flag is paid in full wherever the task falls in its area, and a twice-flagged task deep in an area beats a fresh start elsewhere
+- breadth still beats depth, splitting still pays less than four times, one area alone stays well below a balanced day, and weekend bursts do not stand in for consistency
+- kept routines are worth nearly twice new ones, and warm routines lift the same effort
+
+Verified on a production build in a desktop browser at phone size, with made-up data: version 2 data loading and being saved as version 3, the line with no mark, the Surge look above 100 and the ordinary look below it, flagged rows warmer than plain ones, and Settings without the line. The travelling band was checked only by its presence, not watched moving. Not verified on an iPhone.
+
+The one real history available, the day of testing saved in the dev app (69 completions across six areas in one sitting, 386 points), reaches 99.9 under these rules. That is one extreme day, so it says nothing about where an ordinary day lands. The gain scale stays at the modelled 215 until there is a week of real use.
+
+Open after this pass:
+
+1. **Flagging everything reaches Surge.** Undiminished flags were asked for, and this is their cost. If flags get overused, the fallback is a smaller flat bonus.
+2. **This undoes most of the first retune's difficulty.** One task in each of five areas now sits at 76. With no line to pass that may not matter; watch it.
+3. **Is two tasks in each of four areas the right "balanced day"?** The gain scale is the dial.
+4. **Does the edge still read without a mark?** Colour now carries the level alone.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications.
@@ -232,18 +295,24 @@ Cloud sync, routine pause, notifications.
 | 4 | The HEAT number is hidden in the product UI | Assumed; revisit at M3 |
 | 5 | Hosting: GitHub Pages from the public repository `lukshep/heat-os` | Decided 2026-11-12 |
 | 6 | Seed areas are Work, Health, Home, People, Growth, all editable | Assumed |
-| 7 | The aim is to touch the line once a day, not to stay above it | Decided 2026-11-12 |
-| 8 | One task in each area is not enough to reach the line | Decided 2026-11-12 |
+| 7 | The aim is to touch the line once a day, not to stay above it | Replaced by 19 |
+| 8 | One task in each area is not enough to reach the line | Dropped with the line (19) |
 | 9 | A routine missed two or three times in a row is cold | Decided 2026-11-12 |
 | 10 | The app is dark only | Assumed at M3; revisit at checkpoint 2 |
 | 11 | Completed tasks are not listed anywhere; the Undo toast is the only way back | Assumed at M3; revisit at checkpoint 2 |
 | 12 | Adding a task to an area or project is behind a plus button, not an always-visible field | Assumed at M5; revisit at checkpoint 2 |
 | 13 | Projects cannot be moved or reordered | Assumed at M5; add when it is missed |
-| 14 | The line can be set from 20 to 90, and the day start from midnight to 8 am | Assumed at M6 |
-| 15 | The mark glows once when HEAT reaches it, and nothing is kept of it | Assumed at M6; remove if it starts to feel like a daily pass or fail |
+| 14 | The day start can be set from midnight to 8 am | Assumed at M6; the line's own setting went with the line (19) |
+| 15 | The mark glows once when HEAT reaches it, and nothing is kept of it | Removed with the line (19) |
 | 16 | HEAT is shown as a line round the edge of the screen, not a bar | Decided 2026-11-12; a side thermometer is the fallback if it reads poorly |
 | 17 | Everything that is not HEAT feedback is neutral grey; the only colour is temperature | Decided 2026-11-12 |
 | 18 | The tab bar is icons only, with the plus button in the centre and Settings as its own screen | Decided 2026-11-12 |
+| 19 | There is no line to reach and no daily success or failure. HEAT is a gauge of recent activity and consistency | Decided 2026-11-12 |
+| 20 | HEAT can pass 100 into Surge, up to 120. A full gauge is difficult and uncommon | Decided 2026-11-12; the cap of 120 is a proposal to revisit |
+| 21 | Surge cools more slowly than the rest of the gauge, so the overflow is a buffer | Decided 2026-11-12, chosen from the options in the M9 plan |
+| 22 | Important and Avoided add a flat bonus that nothing diminishes | Decided 2026-11-12 |
+| 23 | Consistent, balanced activity should sit at about 70 to 85 | Decided 2026-11-12; "balanced" is assumed to be two tasks in each of four areas |
+| 24 | Surge is shown only by the line itself. It is not named in the app and nothing is recorded | Assumed at M9 |
 
 ## Tuning log
 
@@ -258,3 +327,9 @@ Record every change to `DEFAULT_CONFIG` here: date, what changed, why, and which
 | 2026-11-12 | New: flag bonus halves with each flagged completion in a day | Flagging everything was worth ten points |
 | 2026-11-12 | Warmth: a completion closes 25% of the gap to full; a miss removes 20%, 80%, then all of what is left. Was flat +0.15 and -0.07 | With flat steps any routine kept more often than missed reached full warmth. Two or three misses in a row should leave it cold |
 | 2026-11-12 | Removed the miss escalation cap | The new miss rule reaches 100% by the third miss, so the cap had nothing to do |
+| 2026-11-12 | Removed the threshold | There is no line to reach any more (M9) |
+| 2026-11-12 | Gains aim at 120 instead of 100; the ceiling and the full mark are the constants `MAX_HEAT` and `FULL_HEAT` | Surge: HEAT can pass 100 |
+| 2026-11-12 | New: retention in Surge, 0.85 | Overflow should act as a buffer, so it cools at 15% a day instead of 20% |
+| 2026-11-12 | Gain scale 300 to 215 | With gains aimed at 120, this puts a balanced day (85 points) at a peak of 85 and a low of 68, and a full gauge about 206 points away |
+| 2026-11-12 | Flags: flat 0.75 of the base each (7.5 points), added after the area factor. Was a multiplier of 0.5 each that halved with every flagged completion; the halving rule is removed | Important and Avoided should be worth substantially more wherever they fall, with no diminishing returns. "Flag everything" now reaches Surge, which is accepted for now |
+| 2026-11-12 | Warmth now multiplies only the area part of a routine's points, not its flags | Follows from flags being flat |

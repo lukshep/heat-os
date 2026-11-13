@@ -69,22 +69,18 @@ export interface Deferred {
   taskIds: ID[];
 }
 
-/** The two parts of the HEAT config a person can set for themselves. */
+/** The part of the HEAT config a person can set for themselves. */
 export interface Settings {
-  /** Where the line sits on the bar. */
-  threshold: number;
   /** The local hour at which a new day begins. */
   dayStartHour: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  threshold: DEFAULT_CONFIG.threshold,
   dayStartHour: DEFAULT_CONFIG.dayStartHour,
 };
 
-/** How far each setting can go. The line stays on the bar; the day starts somewhere in the small hours. */
+/** How far each setting can go. The day starts somewhere in the small hours. */
 export const SETTING_LIMITS = {
-  threshold: { min: 20, max: 90, step: 5 },
   dayStartHour: { min: 0, max: 8, step: 1 },
 } as const;
 
@@ -95,9 +91,8 @@ function withinLimits(value: unknown, limits: { min: number; max: number; step: 
 }
 
 /** Settings with every value on a step and inside its limits, whatever was asked for. */
-export function normalizeSettings(settings: { threshold?: unknown; dayStartHour?: unknown }): Settings {
+export function normalizeSettings(settings: { dayStartHour?: unknown }): Settings {
   return {
-    threshold: withinLimits(settings.threshold, SETTING_LIMITS.threshold, DEFAULT_SETTINGS.threshold),
     dayStartHour: withinLimits(settings.dayStartHour, SETTING_LIMITS.dayStartHour, DEFAULT_SETTINGS.dayStartHour),
   };
 }
@@ -115,9 +110,10 @@ export interface AppState {
 
 /**
  * Bump this, and add a step to `migrate` in storage.ts, whenever the persisted shape changes.
- * Version 2 added `settings`.
+ * Version 2 added `settings`. Version 3 removed the threshold from them, when the line to
+ * reach each day was dropped.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SEED_AREA_NAMES = ['Work', 'Health', 'Home', 'People', 'Growth'];
 
