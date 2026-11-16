@@ -115,6 +115,22 @@ button {
   animation: screen-in 180ms ease-out;
 }
 
+/*
+ * No scroll bars. They sit against the edge line and read as a second gauge. Scrolling is
+ * unchanged: swipe, wheel, trackpad and keys still work.
+ */
+.main,
+.pager,
+.page {
+  scrollbar-width: none;
+}
+
+.main::-webkit-scrollbar,
+.pager::-webkit-scrollbar,
+.page::-webkit-scrollbar {
+  display: none;
+}
+
 /* Each screen settles in as its tab is chosen. */
 @keyframes screen-in {
   from {
@@ -886,11 +902,6 @@ button {
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-}
-
-.pager::-webkit-scrollbar {
-  display: none;
 }
 
 .page {
