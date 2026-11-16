@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { TEST_CONFIG as config } from './testConfig';
-import { hit, isScheduledOn, miss, warmthAt, type Schedule, type WarmthBase, type WarmthState } from './warmth';
+import { LAST_DAY, type Schedule } from './schedule';
+import { hit, miss, warmthAt, warmthCarriedOver, type WarmthBase, type WarmthState } from './warmth';
 
 const cold: WarmthState = { warmth: 0, missRun: 0 };
 const full: WarmthState = { warmth: 1, missRun: 0 };
-const DAILY: Schedule = { days: [0, 1, 2, 3, 4, 5, 6] };
-const MON_WED_FRI: Schedule = { days: [1, 3, 5] };
+const DAILY: Schedule = { every: 'week', days: [0, 1, 2, 3, 4, 5, 6] };
+const MON_WED_FRI: Schedule = { every: 'week', days: [1, 3, 5] };
+const MONTH_END: Schedule = { every: 'month', days: [LAST_DAY] };
 
 /** Sunday 4 January 2026, so the first settled day is Monday the 5th. */
 const base: WarmthBase = { ...cold, asOf: '2026-01-04' };
@@ -84,14 +86,6 @@ describe('miss', () => {
   });
 });
 
-describe('isScheduledOn', () => {
-  it('matches weekdays', () => {
-    expect(isScheduledOn(MON_WED_FRI, '2026-01-05')).toBe(true);
-    expect(isScheduledOn(MON_WED_FRI, '2026-01-06')).toBe(false);
-    expect(isScheduledOn(DAILY, '2026-01-06')).toBe(true);
-  });
-});
-
 describe('warmthAt', () => {
   const threeDays = new Set(['2026-01-05', '2026-01-06', '2026-01-07']);
   const afterThreeHits = 1 - 0.75 ** 3;
@@ -116,13 +110,32 @@ describe('warmthAt', () => {
     expect(warmthAt(base, DAILY, done, '2026-01-06', config).warmth).toBe(0.25);
   });
 
-  it('ignores unscheduled days, completed or not', () => {
-    const scheduledOnly = new Set(['2026-01-05', '2026-01-07']);
-    const withExtra = new Set([...scheduledOnly, '2026-01-06']);
-    const expected = warmthAt(base, MON_WED_FRI, scheduledOnly, '2026-01-09', config);
+  it('ignores days that are not dates of the schedule', () => {
+    const datesOnly = new Set(['2026-01-05', '2026-01-07']);
+    const withExtra = new Set([...datesOnly, '2026-01-06']);
+    const expected = warmthAt(base, MON_WED_FRI, datesOnly, '2026-01-09', config);
     expect(expected.warmth).toBeCloseTo(1 - 0.75 ** 2, 10);
     expect(expected.missRun).toBe(0);
     expect(warmthAt(base, MON_WED_FRI, withExtra, '2026-01-09', config)).toEqual(expected);
+  });
+
+  it('keeps a date open until the next one comes, so it can still be done late', () => {
+    // Monday is not done. On Tuesday it is still open; Wednesday's date settles it as a miss.
+    const warmBase: WarmthBase = { warmth: 0.5, missRun: 0, asOf: '2026-01-04' };
+    expect(warmthAt(warmBase, MON_WED_FRI, new Set(), '2026-01-06', config)).toEqual({ warmth: 0.5, missRun: 0 });
+    expect(warmthAt(warmBase, MON_WED_FRI, new Set(), '2026-01-07', config).missRun).toBe(1);
+    // Done on Tuesday, counted for Monday: a hit once Wednesday comes.
+    const late = new Set(['2026-01-05']);
+    expect(warmthAt(warmBase, MON_WED_FRI, late, '2026-01-07', config)).toEqual({ warmth: 0.625, missRun: 0 });
+  });
+
+  it('settles a monthly routine month by month', () => {
+    const monthly: WarmthBase = { ...cold, asOf: '2025-12-31' };
+    const kept = new Set(['2026-01-31', '2026-02-28']);
+    // February's date is still open until the end of March.
+    expect(warmthAt(monthly, MONTH_END, kept, '2026-03-30', config).warmth).toBe(0.25);
+    expect(warmthAt(monthly, MONTH_END, kept, '2026-03-31', config).warmth).toBeCloseTo(0.4375, 10);
+    expect(warmthAt(monthly, MONTH_END, kept, '2026-04-30', config).missRun).toBe(1);
   });
 
   it('continues from the base rather than from zero', () => {
@@ -131,5 +144,33 @@ describe('warmthAt', () => {
     // The second miss in a row removes 0.2 * 2 * 2 = 80% of what is left.
     expect(state.missRun).toBe(2);
     expect(state.warmth).toBeCloseTo(0.12, 10);
+  });
+});
+
+describe('warmthCarriedOver', () => {
+  const warmBase: WarmthBase = { warmth: 0.5, missRun: 0, asOf: '2026-01-04' };
+
+  it('counts the date still open from before today if it was done', () => {
+    const kept = new Set(['2026-01-05']);
+    expect(warmthCarriedOver(warmBase, MON_WED_FRI, kept, '2026-01-06', config)).toEqual({ warmth: 0.625, missRun: 0 });
+  });
+
+  it('drops that date without a miss if it was not done', () => {
+    expect(warmthCarriedOver(warmBase, MON_WED_FRI, new Set(), '2026-01-06', config)).toEqual({
+      warmth: 0.5,
+      missRun: 0,
+    });
+  });
+
+  it('keeps what was already settled', () => {
+    // Monday was missed and settled by Wednesday. Wednesday itself is still open on Thursday.
+    const state = warmthCarriedOver(warmBase, MON_WED_FRI, new Set(), '2026-01-08', config);
+    expect(state.missRun).toBe(1);
+    expect(state.warmth).toBeCloseTo(0.4, 10);
+  });
+
+  it("leaves today's date to the new schedule", () => {
+    const kept = new Set(['2026-01-05']);
+    expect(warmthCarriedOver(warmBase, MON_WED_FRI, kept, '2026-01-05', config)).toEqual({ warmth: 0.5, missRun: 0 });
   });
 });

@@ -1,3 +1,5 @@
+import type { Schedule } from '../heat/schedule';
+
 /** Weekdays are numbered 0 (Sunday) to 6 (Saturday), as schedules store them. */
 
 interface WeekInfo {
@@ -27,7 +29,7 @@ export function weekdayName(day: number, locale?: string): string {
   return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(A_SUNDAY + day * DAY_MS);
 }
 
-/** A routine's schedule in a few words. */
+/** A weekly routine's days in a few words. */
 export function describeDays(days: readonly number[], locale?: string): string {
   const has = (wanted: number[]) => days.length === wanted.length && wanted.every((day) => days.includes(day));
   if (has([0, 1, 2, 3, 4, 5, 6])) return 'Every day';
@@ -37,4 +39,9 @@ export function describeDays(days: readonly number[], locale?: string): string {
     .filter((day) => days.includes(day))
     .map((day) => weekdayName(day, locale))
     .join(', ');
+}
+
+/** How a routine repeats, in a few words. */
+export function describeSchedule(schedule: Schedule, locale?: string): string {
+  return schedule.every === 'week' ? describeDays(schedule.days, locale) : 'Monthly';
 }

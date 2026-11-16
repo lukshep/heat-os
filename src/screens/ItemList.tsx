@@ -28,9 +28,9 @@ export function ItemList({ items, view, onComplete, showPlace = false, routinesS
   const [onScreen, setOnScreen] = useState(false);
   useEffect(() => setOnScreen(true), []);
 
-  /** A routine already done today is worth nothing more until tomorrow. */
+  /** A routine already done is worth nothing more until it is open again. */
   function temperature(item: ListItem): number {
-    if (item.doneCompletionId !== null) return 0;
+    if (item.done) return 0;
     return temperatureOf(pointsNow(view.heat, scorable(item), view.config), view.config);
   }
 
@@ -47,9 +47,9 @@ export function ItemList({ items, view, onComplete, showPlace = false, routinesS
           arrives={onScreen}
           onToggle={() => setOpenId(openId === item.id ? null : item.id)}
           onComplete={() => onComplete(item)}
-          onUndo={() => item.doneCompletionId !== null && actions.undoCompletion(item.doneCompletionId)}
+          onUndo={() => item.undoId !== null && actions.undoCompletion(item.undoId)}
           onUpdate={(patch) => actions.updateItem(item, patch)}
-          onSetDays={(days) => actions.setDays(item, days)}
+          onSetSchedule={(schedule) => actions.setSchedule(item, schedule)}
           onDelete={() => actions.deleteItem(item)}
           context={showPlace ? placeLabel(view.places, item) : undefined}
           trailing={trailing?.(item)}

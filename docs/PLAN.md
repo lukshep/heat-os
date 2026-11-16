@@ -21,6 +21,11 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M10 | Effort, Cooling and a reset | Deployed 2026-11-12; not yet tried on an iPhone |
 | M11 | Priority and Friction | Deployed 2026-11-12; not yet tried on an iPhone |
 | M12 | Rings show points, not HEAT | Built 2026-11-13; not yet deployed |
+| M13 | Due dates and saved format version 6 | Built 2026-11-15; not yet deployed |
+| M14 | Monthly routines | Planned |
+| M15 | Dates and times on tasks | Planned |
+| M16 | Calendar in Today | Planned |
+| M17 | Areas | Planned |
 
 The first prototype is M1–M3.
 
@@ -337,9 +342,34 @@ Asked for after M11. A ring's colour no longer depends on where HEAT is (decisio
 
 Verified: unit tests for `pointsNow` (independent of HEAT) and `temperatureOf` (1 at the most any item can earn and never more; tags and warmth by the same step anywhere in an area; unchanged by Effort). On a production build in a desktop browser at phone size, with made-up data: every ring's colour and glow identical with HEAT at 0 and at about 117, the values matching the model, and completing a Work task cooling the other Work rows while the Inbox row stayed as it was. Not verified on an iPhone, where the thing to judge is whether a tag's step is visible at a glance.
 
+### Scheduling and Areas (M13–M17)
+
+Asked for on 2026-11-15: a calendar, dates and times on tasks, monthly routines, and an Areas tab in place of Projects. Decisions 32 to 42 record the choices. The plan, in short:
+
+- **Calendar inside Today.** A week strip (today and the next six days) under the heading, and a month grid from the month name. Picking a later day lists the tasks planned for it and the routines due on it; routine dates there cannot be completed yet, except a monthly one open early. A "Plan for …" field on a later day adds a dated Inbox task. Past days are dimmed and show nothing. A grey dot, never a count, marks days with a dated task or a monthly routine.
+- **Today's order.** Timed items in time order, then due routines, then tasks planned for today or an earlier day, then suggestions from undated tasks until there are five tasks. Planned tasks have no swap.
+- **Editor.** A When row (Today, Tomorrow, Pick, None) and a Time field. Repeat starts with Weekly or Monthly; Monthly is a grid of 1 to 30 and Last day.
+- **Areas.** The Projects tab becomes Areas: an overview of area names with their projects on a second line, no counts and no colour, opening into one page per area. Pages swipe sideways, with grey dots for position; on desktop, ‹ › buttons and the arrow keys. Each page has an add field and New project, then the area's own routines and tasks, then its projects as foldable sections. A back button returns to the overview; tapping the title opens rename and delete.
+- **Migration.** One schema bump (version 6) in M13 carries every new field, so saved data upgrades once. Nothing moves; area order becomes swipe order.
+
+Effects on HEAT: dates and times change nothing in scoring, only which items Today shows. Daily routines are unchanged, so the scenario table holds. Weekly routines keep warmth when done late, take a miss only when the next date comes, and add HEAT at most once per date. Monthly routines warm slowly and barely move HEAT. Past HEAT never moves.
+
+### M13 — Due dates and saved format version 6
+
+The foundation for M14–M17, with no new screens.
+
+- **Each routine date stays open until the next.** `src/heat/schedule.ts` works out a routine's dates, weekly or monthly, and where it stands today: open (due, or early for a monthly one), done, or waiting for its first date. Warmth settles a date when the next one comes, reading the date each completion counted for.
+- **What changes on screen.** A weekly routine missed on its day stays on Today until it is done or its next date comes. Once done, it shows a check in its area until its next date, and that check can only take back a completion made today. A routine can no longer be completed again on the days between its dates.
+- **Changing the days** keeps the warmth earned. A date still open counts if it was done and is dropped without a miss if not (`warmthCarriedOver`).
+- **Model.** Tasks have `date` and `time`, routines have `time`, schedules are `{ every: 'week' | 'month', days }`, and completions record `occurrence` in place of `scheduled`. The reducer takes dates and times on tasks, times on routines, and checks their formats. `MONTHLY_EARLY_DAYS` (7) sits beside the config as a calendar rule; `DEFAULT_CONFIG` is unchanged, so there is no tuning-log entry.
+
+Saved data: the format is now version 6. Version 5 documents are upgraded with no dates or times, weekly schedules, and each completion's date taken from whether its day was scheduled. A routine whose last date was missed but is still open is not counted as missed yet, so its warmth is briefly a little higher than before. An off-day completion from before the upgrade does not count for the date it followed, so that routine can show as due again once.
+
+Verified: unit tests for month lengths, day keys, every schedule rule (short months, leap years, two days on one date, the open window, opening early), the new warmth rule and carry-over, the reducer's dates and times, and the version 5 upgrade, including warmth unchanged. The scenario invariants pass untouched. On a production build in a desktop browser at phone size, with made-up data: a version 5 document loading and being saved as version 6; a Friday routine missed on Friday showing on Sunday's Today, completed there for Friday and taken back from its check; a Saturday routine done the day before showing a check that cannot be pressed; and changing a routine's days keeping its warmth with no miss. Not verified on an iPhone.
+
 ### Later, not planned in detail
 
-Cloud sync, routine pause, notifications.
+Cloud sync, routine pause, notifications, reordering areas.
 
 ## Decisions
 
@@ -376,6 +406,17 @@ Cloud sync, routine pause, notifications.
 | 29 | Priority adds 20% of a task's reward, Friction 30%, both 50%. The shares add, never multiply | Decided 2026-11-12 |
 | 30 | Important is renamed Priority and Avoided is renamed Friction, in the app, the code and the saved data | Decided 2026-11-12 |
 | 31 | A ring's colour shows the points the item would earn now, on a fixed scale topped by the most any item can earn. HEAT plays no part | Decided 2026-11-13 |
+| 32 | A task's date is a planned day, not a deadline. Once it has passed, the task waits on Today; nothing is ever overdue | Decided 2026-11-15 |
+| 33 | The calendar lives inside Today: a week strip and a month grid. Past days show nothing | Decided 2026-11-15 |
+| 34 | Tasks (with a date) and routines can have a time of day. It orders and labels; there are no reminders | Decided 2026-11-15 |
+| 35 | Today lists due routines and planned tasks, then suggestions from undated tasks until there are five tasks. Dated tasks are not suggested before their day, and planned tasks have no swap | Decided 2026-11-15 |
+| 36 | Routines repeat weekly or monthly by day of the month (1 to 30 and Last day). A day a month lacks falls on its last day | Decided 2026-11-15 |
+| 37 | Each routine date stays open until the next one comes. Done late, it counts in full; a routine counts once per date | Decided 2026-11-15 |
+| 38 | A monthly date opens up to a week early once the one before is done. A single date cannot be moved | Decided 2026-11-15 |
+| 39 | Monthly routines build warmth under the same rules as the rest | Decided 2026-11-15 |
+| 40 | The Projects tab becomes Areas: an overview with no counts or colour, opening into one page per area that swipes to the next | Decided 2026-11-15 |
+| 41 | Routines stay where they are filed, first in their section | Decided 2026-11-15 |
+| 42 | A row's check takes back only a completion made today | Decided 2026-11-15 |
 
 ## Tuning log
 

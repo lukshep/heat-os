@@ -126,7 +126,7 @@ describe('projects', () => {
       state,
       addTask('t1', 'Write copy', work, 'website'),
       addTask('t2', 'Check links', work, 'website'),
-      { type: 'task/makeRoutine', id: 't2', at: 3500, days: [1], asOf: '2026-01-04' },
+      { type: 'task/makeRoutine', id: 't2', at: 3500, schedule: { every: 'week', days: [1] }, asOf: '2026-01-04' },
       addTask('t3', 'Press release', work, 'launch'),
     );
     const gone = run(filled, { type: 'project/delete', id: 'website', at: 5000 });
@@ -208,7 +208,7 @@ describe('putting items in places', () => {
       type: 'task/makeRoutine',
       id: 'r1',
       at: 3500,
-      days: [1],
+      schedule: { every: 'week', days: [1] },
       asOf: '2026-01-04',
     });
     const moved = run(routine, { type: 'routine/update', id: 'r1', at: 4000, patch: { projectId: 'blog' } });
@@ -224,7 +224,7 @@ describe('putting items in places', () => {
       type: 'task/makeRoutine',
       id: 't1',
       at: 3500,
-      days: [1],
+      schedule: { every: 'week', days: [1] },
       asOf: '2026-01-04',
     });
     expect(item(routine, 't1')).toMatchObject({ kind: 'routine', projectId: 'blog' });

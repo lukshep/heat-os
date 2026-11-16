@@ -1,7 +1,8 @@
 import { FULL_HEAT, type HeatConfig } from './config';
 import { addDays, dayKeyAt, DAY_MS, HOUR_MS, type DayKey } from './day';
 import { traceHeat, type CompletionFact, type ScoredCompletion } from './engine';
-import { warmthAt, type Schedule, type WarmthBase } from './warmth';
+import type { Schedule } from './schedule';
+import { warmthAt, type WarmthBase } from './warmth';
 
 /** A repeating pattern of behaviour to play through the engine. */
 export interface Scenario {
@@ -52,7 +53,7 @@ export interface SimResult {
 /** A Monday, so day 0 of every run is the same weekday. The simulated clock is UTC. */
 const START_DAY: DayKey = '2026-01-05';
 const START_MS = Date.UTC(2026, 0, 5);
-const EVERY_DAY: Schedule = { days: [0, 1, 2, 3, 4, 5, 6] };
+const EVERY_DAY: Schedule = { every: 'week', days: [0, 1, 2, 3, 4, 5, 6] };
 
 function wholeNumber(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;

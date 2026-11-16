@@ -62,6 +62,12 @@ export const FULL_HEAT = 100;
 /** The ceiling gains approach but never reach. Surge is the stretch between FULL_HEAT and here. */
 export const MAX_HEAT = 120;
 
+/**
+ * How many days before its date a monthly routine can be done, once the previous one is done,
+ * so a bill can be ticked when it is paid. A rule of the calendar, not a tunable of HEAT.
+ */
+export const MONTHLY_EARLY_DAYS = 7;
+
 /** How much a day's work warms HEAT, a person's own setting. In order, least work first. */
 export const EFFORTS = ['easier', 'standard', 'harder'] as const;
 export type Effort = (typeof EFFORTS)[number];

@@ -118,6 +118,63 @@ describe('tasks', () => {
   });
 });
 
+describe('planned days', () => {
+  const plan = (patch: Extract<Action, { type: 'task/update' }>['patch'], at = 2500): Action => ({
+    type: 'task/update',
+    id: 't1',
+    at,
+    patch,
+  });
+
+  it('starts with no day and no time', () => {
+    const state = run(fresh(), addTask('t1', 'Fix tap'));
+    expect(state.tasks.t1).toMatchObject({ date: null, time: null });
+  });
+
+  it('can be given a day when it is added, if the day is a real one', () => {
+    const add = (id: ID, date: string): Action => ({
+      type: 'task/add',
+      id,
+      at: 2000,
+      title: 'Pay',
+      areaId: null,
+      date,
+    });
+    const state = run(fresh(), add('t1', DAY_2), add('t2', '2026-02-30'));
+    expect(state.tasks.t1?.date).toBe(DAY_2);
+    expect(state.tasks.t2?.date).toBeNull();
+  });
+
+  it('sets a day and a time, and clears the time with the day', () => {
+    const planned = run(fresh(), addTask('t1', 'Fix tap'), plan({ date: DAY_2, time: '09:30' }));
+    expect(planned.tasks.t1).toMatchObject({ date: DAY_2, time: '09:30', updatedAt: 2500 });
+    expect(run(planned, plan({ time: null })).tasks.t1).toMatchObject({ date: DAY_2, time: null });
+    expect(run(planned, plan({ date: null })).tasks.t1).toMatchObject({ date: null, time: null });
+  });
+
+  it('gives no time to a task without a day', () => {
+    const state = run(fresh(), addTask('t1', 'Fix tap'), plan({ time: '09:30' }));
+    expect(state.tasks.t1).toMatchObject({ date: null, time: null });
+  });
+
+  it('ignores a day or time that is not a real one', () => {
+    const planned = run(fresh(), addTask('t1', 'Fix tap'), plan({ date: DAY_2, time: '09:30' }));
+    const garbled = run(planned, plan({ date: 'Tuesday', time: '25:00' }));
+    expect(garbled.tasks.t1).toMatchObject({ date: DAY_2, time: '09:30' });
+  });
+
+  it('keeps its day through a move, and when its area is deleted', () => {
+    const start = fresh();
+    const home = areaId(start, 'Home');
+    const state = run(start, addTask('t1', 'Fix tap', home), plan({ date: DAY_2 }), {
+      type: 'area/delete',
+      id: home,
+      at: 3000,
+    });
+    expect(state.tasks.t1).toMatchObject({ areaId: null, date: DAY_2 });
+  });
+});
+
 describe('completing', () => {
   it('logs the facts and takes the task off the open list', () => {
     const start = fresh();
@@ -140,6 +197,7 @@ describe('completing', () => {
         priority: true,
         friction: false,
         warmth: 0,
+        occurrence: null,
       }),
     ]);
   });

@@ -12,7 +12,8 @@ import {
   type Settings,
 } from './model';
 import { reduce } from './reducer';
-import { heatCompletions, heatConfig, heatTimeline, openTasks } from './selectors';
+import { TEST_CONFIG } from '../heat/testConfig';
+import { heatCompletions, heatConfig, heatTimeline, openTasks, routineLog, routineWarmth } from './selectors';
 import { deserializeState, parseState, serializeState } from './storage';
 
 let counter = 0;
@@ -30,6 +31,32 @@ function current(): Record<string, any> {
   return JSON.parse(JSON.stringify(state));
 }
 
+/** A collection with `change` applied to each record. */
+function eachRecord(collection: Record<string, any>, change: (record: any) => any): Record<string, any> {
+  return Object.fromEntries(Object.entries(collection).map(([id, record]) => [id, change(record)]));
+}
+
+/**
+ * A current document as version 5 saved it: no dates or times, schedules that were always
+ * weekly, and completions that said whether their day was scheduled.
+ */
+function versionFive(): Record<string, any> {
+  const document = current();
+  return {
+    ...document,
+    schemaVersion: 5,
+    tasks: eachRecord(document.tasks, ({ date: _date, time: _time, ...rest }) => rest),
+    routines: eachRecord(document.routines, ({ time: _time, schedule, ...rest }) => ({
+      ...rest,
+      schedule: { days: schedule.days },
+    })),
+    completions: eachRecord(document.completions, ({ occurrence, ...rest }) => ({
+      ...rest,
+      scheduled: occurrence !== null,
+    })),
+  };
+}
+
 /** A collection with its tags under the names every version before 5 saved them by. */
 function oldTags(collection: Record<string, any>): Record<string, any> {
   return Object.fromEntries(
@@ -40,19 +67,9 @@ function oldTags(collection: Record<string, any>): Record<string, any> {
   );
 }
 
-/** The same collection with its tags under their current names. */
-function newTags(collection: Record<string, any>): Record<string, any> {
-  return Object.fromEntries(
-    Object.entries(collection).map(([id, { important, avoided, ...rest }]) => [
-      id,
-      { ...rest, priority: important, friction: avoided },
-    ]),
-  );
-}
-
 /** A current document as a build before version 5 would have saved it. */
 function beforeTagRename(): Record<string, any> {
-  const document = current();
+  const document = versionFive();
   return {
     ...document,
     tasks: oldTags(document.tasks),
@@ -128,8 +145,8 @@ describe('saved data from before settings (version 1)', () => {
   it('keeps everything else exactly as it was', () => {
     const old = versionOne();
     const state = parseState(old);
-    expect(state?.tasks).toEqual(newTags(old.tasks));
-    expect(state?.completions).toEqual(newTags(old.completions));
+    expect(state?.tasks).toEqual(current().tasks);
+    expect(state?.completions).toEqual(current().completions);
     expect(state?.areas).toEqual(old.areas);
     expect(state?.deferred).toEqual(old.deferred);
   });
@@ -151,8 +168,8 @@ describe('saved data from when there was a line to reach (version 2)', () => {
   it('keeps everything else exactly as it was', () => {
     const old = versionTwo();
     const state = parseState(old);
-    expect(state?.tasks).toEqual(newTags(old.tasks));
-    expect(state?.completions).toEqual(newTags(old.completions));
+    expect(state?.tasks).toEqual(current().tasks);
+    expect(state?.completions).toEqual(current().completions);
     expect(state?.areas).toEqual(old.areas);
   });
 
@@ -295,8 +312,8 @@ describe('saved data from before Effort, Cooling and the reset (version 3)', () 
   it('keeps everything else exactly as it was', () => {
     const old = versionThree();
     const state = parseState(old);
-    expect(state?.tasks).toEqual(newTags(old.tasks));
-    expect(state?.completions).toEqual(newTags(old.completions));
+    expect(state?.tasks).toEqual(current().tasks);
+    expect(state?.completions).toEqual(current().completions);
     expect(state?.areas).toEqual(old.areas);
     expect(state?.deferred).toEqual(old.deferred);
   });
@@ -386,8 +403,9 @@ describe('saved data from before the tags were renamed (version 4)', () => {
   it('keeps everything else exactly as it was', () => {
     const old = tagged();
     const state = parseState(old);
-    expect(state?.tasks).toEqual(newTags(old.tasks));
-    expect(state?.completions).toEqual(newTags(old.completions));
+    const now = current();
+    expect(state?.tasks).toEqual({ t1: { ...now.tasks.t1, priority: true } });
+    expect(state?.completions).toEqual({ c1: { ...now.completions.c1, friction: true } });
     expect(state?.settings).toEqual(old.settings);
     expect(state?.areas).toEqual(old.areas);
   });
@@ -402,6 +420,90 @@ describe('saved data from before the tags were renamed (version 4)', () => {
   it('is refused when a record has lost a tag', () => {
     const old = tagged();
     delete old.tasks.t1.important;
+    expect(parseState(old)).toBeNull();
+  });
+});
+
+describe('saved data from before dates and monthly routines (version 5)', () => {
+  /**
+   * A version 5 document with a weekly routine due on Mondays, done on Monday 5 January and
+   * again on Tuesday, a day it was not due.
+   */
+  function withRoutine(): Record<string, any> {
+    const old = versionFive();
+    old.routines.r1 = {
+      id: 'r1',
+      createdAt: 2000,
+      updatedAt: 2000,
+      deletedAt: null,
+      title: 'Run',
+      areaId: 'a1',
+      projectId: null,
+      priority: false,
+      friction: false,
+      schedule: { days: [1] },
+      warmthBase: { warmth: 0.5, missRun: 0, asOf: '2026-01-04' },
+    };
+    const routineCompletion = { ...old.completions.c1, itemId: 'r1', kind: 'routine', warmth: 0.5 };
+    old.completions.c2 = { ...routineCompletion, id: 'c2', dayKey: '2026-01-05', scheduled: true };
+    old.completions.c3 = { ...routineCompletion, id: 'c3', dayKey: '2026-01-06', scheduled: false };
+    return old;
+  }
+
+  it('is brought up to the current version', () => {
+    expect(parseState(withRoutine())?.schemaVersion).toBe(SCHEMA_VERSION);
+  });
+
+  it('gives every task no day and no time', () => {
+    expect(parseState(withRoutine())?.tasks.t1).toMatchObject({ date: null, time: null });
+  });
+
+  it('makes every schedule weekly with the same days, and gives routines no time', () => {
+    const old = withRoutine();
+    const routine = parseState(old)?.routines.r1;
+    expect(routine?.schedule).toEqual({ every: 'week', days: [1] });
+    expect(routine?.time).toBeNull();
+    expect(routine?.warmthBase).toEqual(old.routines.r1.warmthBase);
+  });
+
+  it('records the date a completion counted for only where its day was scheduled', () => {
+    const completions = parseState(withRoutine())?.completions;
+    expect(completions?.c1?.occurrence).toBeNull();
+    expect(completions?.c2?.occurrence).toBe('2026-01-05');
+    expect(completions?.c3?.occurrence).toBeNull();
+    for (const completion of Object.values(completions ?? {})) expect(completion).not.toHaveProperty('scheduled');
+  });
+
+  it('leaves warmth where the old rule put it', () => {
+    const state = parseState(withRoutine());
+    const routine = state?.routines.r1;
+    if (!state || !routine) throw new Error('The document was refused');
+    // Monday's date was kept; Tuesday's extra completion still counts for nothing.
+    const warmth = routineWarmth(routine, routineLog(state, 'r1'), '2026-01-12', TEST_CONFIG).warmth;
+    expect(warmth).toBeCloseTo(0.625, 10);
+  });
+
+  it('keeps everything else exactly as it was', () => {
+    const old = withRoutine();
+    const state = parseState(old);
+    const { scheduled: _scheduled, ...rest } = old.completions.c2;
+    expect(state?.completions.c2).toEqual({ ...rest, occurrence: '2026-01-05' });
+    expect(state?.areas).toEqual(old.areas);
+    expect(state?.settings).toEqual(old.settings);
+    expect(state?.deferred).toEqual(old.deferred);
+    expect(state?.heatResetAt).toEqual(old.heatResetAt);
+  });
+
+  it('does not alter the document it was given', () => {
+    const old = withRoutine();
+    const before = JSON.stringify(old);
+    parseState(old);
+    expect(JSON.stringify(old)).toBe(before);
+  });
+
+  it('is refused when a completion has lost whether its day was scheduled', () => {
+    const old = withRoutine();
+    delete old.completions.c2.scheduled;
     expect(parseState(old)).toBeNull();
   });
 });

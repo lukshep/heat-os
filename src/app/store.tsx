@@ -2,11 +2,11 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 import type { AppState, ID, Settings } from '../data/model';
 import type { Tuning } from '../heat/config';
 import { reduce, type Action, type ItemPatch } from '../data/reducer';
-import { heatConfig, routineDays, routineWarmth, type ListItem } from '../data/selectors';
+import { heatConfig, routineLog, routineToday, routineWarmth, type ListItem } from '../data/selectors';
 import type { StorageAdapter } from '../data/storage';
-
 import { addDays } from '../heat/day';
-import { isScheduledOn } from '../heat/warmth';
+import type { Schedule } from '../heat/schedule';
+import { warmthCarriedOver } from '../heat/warmth';
 import { clock, localDayKey } from './clock';
 
 export interface AppStore {
@@ -44,8 +44,8 @@ export interface Actions {
   addTask(title: string, areaId: ID | null, projectId?: ID | null): void;
   updateItem(item: ListItem, patch: ItemPatch): void;
   deleteItem(item: ListItem): void;
-  /** Sets the weekdays an item repeats on. Any days make it a routine; none make it a one-off task. */
-  setDays(item: ListItem, days: number[]): void;
+  /** Sets how an item repeats. Any days make it a routine; none make it a one-off task. */
+  setSchedule(item: ListItem, schedule: Schedule): void;
   /** Returns the completion's id, which is what undo needs. */
   complete(item: ListItem): ID;
   undoCompletion(completionId: ID): void;
@@ -88,24 +88,33 @@ export function createActions(store: AppStore): Actions {
       store.dispatch({ type, id: item.id, at: clock.touch() });
     },
 
-    setDays(item, days) {
+    setSchedule(item, schedule) {
       const at = clock.touch();
       const today = dayOf(at);
       const yesterday = addDays(today, -1);
 
       if (item.kind === 'task') {
         // A new routine starts cold, and today is its first day that can count.
-        if (days.length > 0) store.dispatch({ type: 'task/makeRoutine', id: item.id, at, days, asOf: yesterday });
+        if (schedule.days.length > 0) {
+          store.dispatch({ type: 'task/makeRoutine', id: item.id, at, schedule, asOf: yesterday });
+        }
         return;
       }
-      if (days.length === 0) return store.dispatch({ type: 'routine/makeTask', id: item.id, at });
+      if (schedule.days.length === 0) return store.dispatch({ type: 'routine/makeTask', id: item.id, at });
 
       const state = store.getState();
       const routine = state.routines[item.id];
       if (!routine) return;
-      // Settle everything up to yesterday under the old schedule; the new one applies from today.
-      const earned = routineWarmth(routine, routineDays(state).get(routine.id), today, config());
-      store.dispatch({ type: 'routine/setDays', id: routine.id, at, days, warmthBase: { ...earned, asOf: yesterday } });
+      // Keep what was earned under the old schedule; the new one applies from today.
+      const log = routineLog(state, routine.id);
+      const earned = warmthCarriedOver(routine.warmthBase, routine.schedule, log.kept, today, config());
+      store.dispatch({
+        type: 'routine/setSchedule',
+        id: routine.id,
+        at,
+        schedule,
+        warmthBase: { ...earned, asOf: yesterday },
+      });
     },
 
     complete(item) {
@@ -122,9 +131,19 @@ export function createActions(store: AppStore): Actions {
       const routine = state.routines[item.id];
       if (routine) {
         // Worked out here, not taken from the row, in case the day turned over since it was drawn.
-        const { warmth } = routineWarmth(routine, routineDays(state).get(routine.id), dayKey, config());
-        const scheduled = isScheduledOn(routine.schedule, dayKey);
-        store.dispatch({ type: 'routine/complete', id, at, dayKey, routineId: routine.id, warmth, scheduled });
+        const log = routineLog(state, routine.id);
+        const now = routineToday(routine, log, dayKey);
+        if (now.done) return id;
+        const { warmth } = routineWarmth(routine, log, dayKey, config());
+        store.dispatch({
+          type: 'routine/complete',
+          id,
+          at,
+          dayKey,
+          routineId: routine.id,
+          warmth,
+          occurrence: now.occurrence,
+        });
       }
       return id;
     },

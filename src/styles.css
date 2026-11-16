@@ -308,7 +308,14 @@ button {
   transform: scale(1.15);
 }
 
-/* A routine that is done for the day stays in its area, quiet, until tomorrow. */
+/*
+ * A routine that is done stays in its area, quiet, until its next date. Only a completion made
+ * today can be taken back from the check; an older one is shown but cannot be pressed.
+ */
+
+.row-check:disabled {
+  cursor: default;
+}
 
 .row.is-done .row-check-ring {
   display: grid;

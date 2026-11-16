@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { DayKey } from '../heat/day';
+import { LAST_DAY, type Schedule } from '../heat/schedule';
 import { TEST_CONFIG as config } from '../heat/testConfig';
 import { createInitialState, type AppState, type ID } from './model';
 import { reduce, type Action } from './reducer';
@@ -11,7 +13,11 @@ const MONDAY = '2026-01-05';
 const TUESDAY = '2026-01-06';
 const WEDNESDAY = '2026-01-07';
 const THURSDAY = '2026-01-08';
+const NEXT_MONDAY = '2026-01-12';
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+const MON_THU = [1, 4];
+
+const week = (days: number[]): Schedule => ({ every: 'week', days });
 
 let counter = 0;
 const newId = (): ID => `id-${++counter}`;
@@ -27,28 +33,29 @@ function areaId(state: AppState, name: string): ID {
 }
 
 /** A fresh install with one routine, "Run", in Health, made on Monday so Sunday is its base. */
-function withRoutine(days: number[] = EVERY_DAY): { state: AppState; health: ID } {
+function withRoutine(schedule: Schedule = week(EVERY_DAY), asOf: DayKey = SUNDAY): { state: AppState; health: ID } {
   const start = createInitialState(1000, newId);
   const health = areaId(start, 'Health');
   const state = run(
     start,
     { type: 'task/add', id: 'run', at: 2000, title: 'Run', areaId: health },
-    { type: 'task/makeRoutine', id: 'run', at: 2100, days, asOf: SUNDAY },
+    { type: 'task/makeRoutine', id: 'run', at: 2100, schedule, asOf },
   );
   return { state, health };
 }
 
-const complete = (id: ID, dayKey: string, warmth = 0, scheduled = true): Action => ({
+/** Completes "Run" on `dayKey`, counting for `occurrence`: that same day unless said otherwise. */
+const complete = (id: ID, dayKey: DayKey, warmth = 0, occurrence: DayKey | null = dayKey): Action => ({
   type: 'routine/complete',
   id,
   at: 3000,
   dayKey,
   routineId: 'run',
   warmth,
-  scheduled,
+  occurrence,
 });
 
-function routineOn(state: AppState, today: string): ListItem {
+function routineOn(state: AppState, today: DayKey): ListItem {
   const item = listItems(state, today, config).find((candidate) => candidate.id === 'run');
   if (!item) throw new Error('The routine is not listed');
   return item;
@@ -56,7 +63,7 @@ function routineOn(state: AppState, today: string): ListItem {
 
 describe('making a routine', () => {
   it('turns a filed task into a routine that keeps its id', () => {
-    const { state, health } = withRoutine([5, 1, 3]);
+    const { state, health } = withRoutine(week([5, 1, 3]));
     expect(openTasks(state)).toEqual([]);
     expect(state.tasks.run?.deletedAt).toBe(2100);
     expect(routineOn(state, MONDAY)).toMatchObject({
@@ -64,14 +71,19 @@ describe('making a routine', () => {
       kind: 'routine',
       title: 'Run',
       areaId: health,
-      days: [1, 3, 5],
+      repeat: week([1, 3, 5]),
       warmth: 0,
     });
   });
 
   it('keeps only real weekdays, once each', () => {
-    const { state } = withRoutine([5, 1, 1, 9, -1, 2.5]);
-    expect(routineOn(state, MONDAY).days).toEqual([1, 5]);
+    const { state } = withRoutine(week([5, 1, 1, 9, -1, 2.5]));
+    expect(routineOn(state, MONDAY).repeat).toEqual(week([1, 5]));
+  });
+
+  it('keeps only real days of the month, once each', () => {
+    const { state } = withRoutine({ every: 'month', days: [LAST_DAY, 0, 15, 1, 15, 32, 2.5] });
+    expect(routineOn(state, MONDAY).repeat).toEqual({ every: 'month', days: [1, 15, LAST_DAY] });
   });
 
   it('needs an area and at least one day', () => {
@@ -82,12 +94,33 @@ describe('making a routine', () => {
       title: 'Loose',
       areaId: null,
     });
-    const unfiled = run(start, { type: 'task/makeRoutine', id: 'loose', at: 2100, days: [1], asOf: SUNDAY });
+    const unfiled = run(start, { type: 'task/makeRoutine', id: 'loose', at: 2100, schedule: week([1]), asOf: SUNDAY });
     expect(unfiled).toBe(start);
 
-    const { state } = withRoutine();
-    const filed = run(state, { type: 'task/add', id: 'read', at: 2200, title: 'Read', areaId: state.routines.run!.areaId });
-    expect(run(filed, { type: 'task/makeRoutine', id: 'read', at: 2300, days: [], asOf: SUNDAY })).toBe(filed);
+    const { state, health } = withRoutine();
+    const filed = run(state, { type: 'task/add', id: 'read', at: 2200, title: 'Read', areaId: health });
+    const makeRoutine = (schedule: Schedule): Action => ({
+      type: 'task/makeRoutine',
+      id: 'read',
+      at: 2300,
+      schedule,
+      asOf: SUNDAY,
+    });
+    expect(run(filed, makeRoutine(week([])))).toBe(filed);
+    expect(run(filed, makeRoutine(week([7, 8])))).toBe(filed);
+  });
+
+  it("keeps the task's time but not its date", () => {
+    const start = createInitialState(1000, newId);
+    const health = areaId(start, 'Health');
+    const state = run(
+      start,
+      { type: 'task/add', id: 'run', at: 2000, title: 'Run', areaId: health, date: MONDAY },
+      { type: 'task/update', id: 'run', at: 2050, patch: { time: '07:30' } },
+      { type: 'task/makeRoutine', id: 'run', at: 2100, schedule: week(EVERY_DAY), asOf: SUNDAY },
+    );
+    expect(state.routines.run?.time).toBe('07:30');
+    expect(routineOn(state, MONDAY)).toMatchObject({ date: null, time: '07:30' });
   });
 
   it('lists routines ahead of tasks', () => {
@@ -98,32 +131,51 @@ describe('making a routine', () => {
 });
 
 describe('a routine through the week', () => {
-  it('is due only on its scheduled days', () => {
-    const { state } = withRoutine([1]);
-    expect(routineOn(state, MONDAY).dueToday).toBe(true);
-    expect(routineOn(state, TUESDAY).dueToday).toBe(false);
+  it('is due from its date until it is done or the next date comes', () => {
+    const { state } = withRoutine(week(MON_THU));
+    expect(routineOn(state, MONDAY)).toMatchObject({ due: true, occurrence: MONDAY, done: false });
+    // Not done on Monday: still due, and still counting for Monday, until Thursday.
+    expect(routineOn(state, WEDNESDAY)).toMatchObject({ due: true, occurrence: MONDAY, done: false });
+    expect(routineOn(state, THURSDAY)).toMatchObject({ due: true, occurrence: THURSDAY, done: false });
+  });
+
+  it('waits until its first date after it is made', () => {
+    const { state } = withRoutine(week([4]), MONDAY);
+    expect(routineOn(state, TUESDAY)).toMatchObject({ due: false, occurrence: null, done: false });
+    expect(routineOn(state, THURSDAY)).toMatchObject({ due: true, occurrence: THURSDAY });
   });
 
   it('is done for the day once completed, and due again the next day', () => {
     const { state, health } = withRoutine();
     const done = run(state, complete('c1', MONDAY));
-    expect(routineOn(done, MONDAY).doneCompletionId).toBe('c1');
-    expect(routineOn(done, TUESDAY).doneCompletionId).toBeNull();
+    expect(routineOn(done, MONDAY)).toMatchObject({ done: true, due: false, undoId: 'c1' });
+    expect(routineOn(done, TUESDAY)).toMatchObject({ done: false, due: true, undoId: null });
     expect(liveCompletions(done)).toEqual([
-      expect.objectContaining({ kind: 'routine', itemId: 'run', dayKey: MONDAY, areaId: health, scheduled: true }),
+      expect.objectContaining({ kind: 'routine', itemId: 'run', dayKey: MONDAY, areaId: health, occurrence: MONDAY }),
     ]);
   });
 
-  it('counts once a day', () => {
+  it('stays done until its next date, and can be taken back only on the day it was done', () => {
+    const { state } = withRoutine(week(MON_THU));
+    const done = run(state, complete('c1', MONDAY));
+    expect(routineOn(done, WEDNESDAY)).toMatchObject({ done: true, due: false, undoId: null });
+    expect(routineOn(done, THURSDAY)).toMatchObject({ done: false, due: true });
+  });
+
+  it('counts once a day, and each date once', () => {
     const { state } = withRoutine();
     const twice = run(state, complete('c1', MONDAY), complete('c2', MONDAY), complete('c3', TUESDAY));
     expect(liveCompletions(twice).map((completion) => completion.id)).toEqual(['c1', 'c3']);
+
+    const { state: twiceWeekly } = withRoutine(week(MON_THU));
+    const late = run(twiceWeekly, complete('c1', TUESDAY, 0, MONDAY), complete('c2', WEDNESDAY, 0, MONDAY));
+    expect(liveCompletions(late).map((completion) => completion.id)).toEqual(['c1']);
   });
 
   it('can be undone', () => {
     const { state } = withRoutine();
     const undone = run(state, complete('c1', MONDAY), { type: 'completion/undo', id: 'c1', at: 3500 });
-    expect(routineOn(undone, MONDAY).doneCompletionId).toBeNull();
+    expect(routineOn(undone, MONDAY)).toMatchObject({ done: false, undoId: null });
     expect(liveCompletions(undone)).toEqual([]);
   });
 
@@ -138,10 +190,16 @@ describe('a routine through the week', () => {
     expect(routineOn(kept, THURSDAY).warmth).toBeCloseTo(0.35, 10);
   });
 
-  it('ignores days it is not scheduled for, done or not', () => {
-    const { state } = withRoutine([1]);
-    const extra = run(state, complete('c1', MONDAY), complete('c2', TUESDAY, 0.25, false));
-    expect(routineOn(extra, THURSDAY).warmth).toBe(0.25);
+  it('counts a late completion for the date it missed', () => {
+    const { state } = withRoutine(week(MON_THU));
+    const late = run(state, complete('c1', TUESDAY, 0, MONDAY));
+    expect(routineOn(late, THURSDAY).warmth).toBe(0.25);
+  });
+
+  it('leaves warmth alone for a completion that counted for no date', () => {
+    const { state } = withRoutine(week([1]));
+    const extra = run(state, complete('c1', MONDAY), complete('c2', TUESDAY, 0.25, null));
+    expect(routineOn(extra, NEXT_MONDAY).warmth).toBe(0.25);
   });
 
   it('records the warmth it was completed with, clamped to 0-1', () => {
@@ -167,29 +225,57 @@ describe('editing a routine', () => {
     expect(routineOn(stuck, MONDAY).areaId).toBe(health);
   });
 
+  it('takes a time of day, but never a date', () => {
+    const { state } = withRoutine();
+    const update = (patch: Extract<Action, { type: 'routine/update' }>['patch']): Action => ({
+      type: 'routine/update',
+      id: 'run',
+      at: 4000,
+      patch,
+    });
+    const timed = run(state, update({ time: '07:30', date: MONDAY }));
+    expect(routineOn(timed, MONDAY)).toMatchObject({ time: '07:30', date: null });
+    expect(timed.routines.run).not.toHaveProperty('date');
+    expect(run(timed, update({ time: '7:30' })).routines.run?.time).toBe('07:30');
+    expect(run(timed, update({ time: null })).routines.run?.time).toBeNull();
+  });
+
   it('keeps the warmth earned so far when the schedule changes', () => {
     const { state } = withRoutine();
     const changed = run(state, complete('c1', MONDAY), complete('c2', TUESDAY), {
-      type: 'routine/setDays',
+      type: 'routine/setSchedule',
       id: 'run',
       at: 5000,
-      days: [1, 4],
+      schedule: week(MON_THU),
       warmthBase: { warmth: 0.4375, missRun: 0, asOf: TUESDAY },
     });
     const item = routineOn(changed, WEDNESDAY);
-    expect(item.days).toEqual([1, 4]);
+    expect(item.repeat).toEqual(week(MON_THU));
     expect(item.warmth).toBeCloseTo(0.4375, 10);
-    // Wednesday is no longer scheduled, so skipping it costs nothing.
+    // Wednesday is no longer a date, so skipping it costs nothing.
     expect(routineOn(changed, THURSDAY).warmth).toBeCloseTo(0.4375, 10);
+  });
+
+  it('can be made monthly', () => {
+    const { state } = withRoutine();
+    const monthly = run(state, {
+      type: 'routine/setSchedule',
+      id: 'run',
+      at: 5000,
+      schedule: { every: 'month', days: [LAST_DAY] },
+      warmthBase: { warmth: 0, missRun: 0, asOf: TUESDAY },
+    });
+    expect(routineOn(monthly, WEDNESDAY).repeat).toEqual({ every: 'month', days: [LAST_DAY] });
+    expect(routineOn(monthly, '2026-01-31')).toMatchObject({ due: true, occurrence: '2026-01-31' });
   });
 
   it('refuses an empty schedule', () => {
     const { state } = withRoutine();
     const same = run(state, {
-      type: 'routine/setDays',
+      type: 'routine/setSchedule',
       id: 'run',
       at: 5000,
-      days: [],
+      schedule: week([]),
       warmthBase: { warmth: 0, missRun: 0, asOf: SUNDAY },
     });
     expect(same).toBe(state);
@@ -205,22 +291,30 @@ describe('editing a routine', () => {
       { type: 'routine/delete', id: 'run', at: 4500 },
     );
     expect(liveCompletions(later)).toEqual([
-      expect.objectContaining({ areaId: health, friction: false, warmth: 0.5 }),
+      expect.objectContaining({ areaId: health, friction: false, warmth: 0.5, occurrence: MONDAY }),
     ]);
     expect(listItems(later, TUESDAY, config)).toEqual([]);
   });
 });
 
 describe('going back to a one-off task', () => {
-  it('returns the same task, edits included', () => {
+  it('returns the same task, edits included, with no date or time', () => {
     const { state, health } = withRoutine();
     const back = run(
       state,
-      { type: 'routine/update', id: 'run', at: 4000, patch: { title: 'Morning run', friction: true } },
+      { type: 'routine/update', id: 'run', at: 4000, patch: { title: 'Morning run', friction: true, time: '07:30' } },
       { type: 'routine/makeTask', id: 'run', at: 4500 },
     );
     expect(listItems(back, MONDAY, config)).toEqual([
-      expect.objectContaining({ id: 'run', kind: 'task', title: 'Morning run', friction: true, areaId: health }),
+      expect.objectContaining({
+        id: 'run',
+        kind: 'task',
+        title: 'Morning run',
+        friction: true,
+        areaId: health,
+        date: null,
+        time: null,
+      }),
     ]);
     expect(back.routines.run?.deletedAt).toBe(4500);
   });
@@ -232,7 +326,7 @@ describe('going back to a one-off task', () => {
       complete('c1', MONDAY),
       complete('c2', TUESDAY),
       { type: 'routine/makeTask', id: 'run', at: 4500 },
-      { type: 'task/makeRoutine', id: 'run', at: 4600, days: EVERY_DAY, asOf: WEDNESDAY },
+      { type: 'task/makeRoutine', id: 'run', at: 4600, schedule: week(EVERY_DAY), asOf: WEDNESDAY },
     );
     expect(routineOn(again, THURSDAY).warmth).toBe(0);
   });
@@ -252,14 +346,30 @@ describe('saving routines', () => {
     expect(parseState(saved)).toEqual(saved);
   });
 
-  it('rejects a routine with a damaged schedule or warmth', () => {
-    const { state } = withRoutine();
-    const badSchedule = JSON.parse(JSON.stringify(state));
-    badSchedule.routines.run.schedule = { days: 'daily' };
-    expect(parseState(badSchedule)).toBeNull();
+  it('accepts a monthly routine', () => {
+    const { state } = withRoutine({ every: 'month', days: [1, LAST_DAY] });
+    const saved = JSON.parse(JSON.stringify(state));
+    expect(parseState(saved)).toEqual(saved);
+  });
 
-    const badWarmth = JSON.parse(JSON.stringify(state));
-    delete badWarmth.routines.run.warmthBase.asOf;
-    expect(parseState(badWarmth)).toBeNull();
+  it('rejects a routine with a damaged schedule, time or warmth', () => {
+    const { state } = withRoutine();
+    const damage = (change: (document: Record<string, any>) => void) => {
+      const document = JSON.parse(JSON.stringify(state));
+      change(document);
+      return parseState(document);
+    };
+    expect(damage((d) => (d.routines.run.schedule = { days: [1] }))).toBeNull();
+    expect(damage((d) => (d.routines.run.schedule = { every: 'year', days: [1] }))).toBeNull();
+    expect(damage((d) => (d.routines.run.schedule = { every: 'week', days: 'daily' }))).toBeNull();
+    expect(damage((d) => (d.routines.run.time = 'early'))).toBeNull();
+    expect(damage((d) => delete d.routines.run.warmthBase.asOf)).toBeNull();
+  });
+
+  it('rejects a completion whose date is not a day', () => {
+    const { state } = withRoutine();
+    const saved = JSON.parse(JSON.stringify(run(state, complete('c1', MONDAY))));
+    saved.completions.c1.occurrence = 'Monday';
+    expect(parseState(saved)).toBeNull();
   });
 });

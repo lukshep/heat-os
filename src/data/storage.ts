@@ -1,5 +1,13 @@
 import { COOLINGS, EFFORTS } from '../heat/config';
-import { DEFAULT_SETTINGS, normalizeSettings, SCHEMA_VERSION, type AppState, type TuningChange } from './model';
+import { isDayKey } from '../heat/day';
+import {
+  DEFAULT_SETTINGS,
+  isClockTime,
+  normalizeSettings,
+  SCHEMA_VERSION,
+  type AppState,
+  type TuningChange,
+} from './model';
 
 /** Where the state document is kept. Swappable so tests, and later sync, need no browser. */
 export interface StorageAdapter {
@@ -62,6 +70,13 @@ const isNumber = (value: unknown) => typeof value === 'number' && Number.isFinit
 const isBoolean = (value: unknown) => typeof value === 'boolean';
 const isStringOrNull = (value: unknown) => value === null || isString(value);
 const isNumberOrNull = (value: unknown) => value === null || isNumber(value);
+const isDayKeyOrNull = (value: unknown) => value === null || isDayKey(value);
+const isClockTimeOrNull = (value: unknown) => value === null || isClockTime(value);
+const isSchedule = (value: unknown) =>
+  isDict(value) &&
+  (value.every === 'week' || value.every === 'month') &&
+  Array.isArray(value.days) &&
+  value.days.every(isNumber);
 
 type Check = (value: unknown) => boolean;
 
@@ -82,6 +97,8 @@ const SHAPES: Record<string, Record<string, Check>> = {
     projectId: isStringOrNull,
     priority: isBoolean,
     friction: isBoolean,
+    date: isDayKeyOrNull,
+    time: isClockTimeOrNull,
   },
   routines: {
     ...META,
@@ -90,7 +107,8 @@ const SHAPES: Record<string, Record<string, Check>> = {
     projectId: isStringOrNull,
     priority: isBoolean,
     friction: isBoolean,
-    schedule: (value) => isDict(value) && Array.isArray(value.days) && value.days.every(isNumber),
+    time: isClockTimeOrNull,
+    schedule: isSchedule,
     warmthBase: (value) =>
       isDict(value) && isNumber(value.warmth) && isNumber(value.missRun) && isString(value.asOf),
   },
@@ -104,7 +122,7 @@ const SHAPES: Record<string, Record<string, Check>> = {
     priority: isBoolean,
     friction: isBoolean,
     warmth: isNumber,
-    scheduled: isBoolean,
+    occurrence: isDayKeyOrNull,
   },
 };
 
@@ -143,31 +161,54 @@ function migrate(raw: Dict): Dict | null {
 
   // Version 5 renamed the tags: Important became Priority, and Avoided became Friction.
   if (document.schemaVersion === 4) {
+    const renameTags = ({ important, avoided, ...rest }: Dict): Dict => ({
+      ...rest,
+      priority: important,
+      friction: avoided,
+    });
     document = {
       ...document,
       schemaVersion: 5,
-      tasks: renameTags(document.tasks),
-      routines: renameTags(document.routines),
-      completions: renameTags(document.completions),
+      tasks: eachRecord(document.tasks, renameTags),
+      routines: eachRecord(document.routines, renameTags),
+      completions: eachRecord(document.completions, renameTags),
+    };
+  }
+
+  // Version 6 added dates and times, monthly schedules, and the date a completion counted for.
+  // Until now every schedule was weekly, and a routine counted only on its scheduled days.
+  if (document.schemaVersion === 5) {
+    document = {
+      ...document,
+      schemaVersion: 6,
+      tasks: eachRecord(document.tasks, (task) => ({ ...task, date: null, time: null })),
+      routines: eachRecord(document.routines, (routine) => ({
+        ...routine,
+        time: null,
+        schedule: isDict(routine.schedule) ? { every: 'week', days: routine.schedule.days } : routine.schedule,
+      })),
+      completions: eachRecord(document.completions, ({ scheduled, ...rest }) => {
+        // A damaged flag stays damaged, so the document is still refused.
+        if (typeof scheduled !== 'boolean') return { ...rest, occurrence: scheduled };
+        return { ...rest, occurrence: scheduled && rest.kind === 'routine' ? rest.dayKey : null };
+      }),
     };
   }
 
   return document.schemaVersion === SCHEMA_VERSION ? document : null;
 }
 
-/** A collection with each record's `important` and `avoided` renamed `priority` and `friction`. */
-function renameTags(collection: unknown): unknown {
+/**
+ * A collection with `change` applied to each record. Anything that is not a record is left as
+ * it is, for the checks to refuse.
+ */
+function eachRecord(collection: unknown, change: (record: Dict) => Dict): unknown {
   if (!isDict(collection)) return collection;
-  const renamed: Dict = {};
+  const changed: Dict = {};
   for (const [id, record] of Object.entries(collection)) {
-    if (!isDict(record)) {
-      renamed[id] = record;
-      continue;
-    }
-    const { important, avoided, ...rest } = record;
-    renamed[id] = { ...rest, priority: important, friction: avoided };
+    changed[id] = isDict(record) ? change(record) : record;
   }
-  return renamed;
+  return changed;
 }
 
 /**

@@ -17,7 +17,8 @@ These are requirements. Do not add features that break them, even as small helpe
 - Settings that change how HEAT behaves (Effort, Cooling, the reset) ask for confirmation before they act, and their steps have names, never numbers.
 - Surge (HEAT above 100) is shown only by the edge line itself. Do not name it in the product UI, record it, count it or reward it.
 - No "areas touched today" indicator, or anything else that turns the day into a checklist.
-- Temperature colour is the main feedback. Numbers stay out of the product UI; the dev screen may show them.
+- A task's date is a planned day, never a deadline. Nothing is ever overdue, and a past day shows no record of what was or was not done. A routine date that passes undone counts as a miss silently.
+- Temperature colour is the main feedback. Numbers stay out of the product UI; the dev screen may show them. Dates, times and days of the month are the only numbers on screen, and none of them is about HEAT.
 - Capture and completion take as few taps as possible. Tasks can be completed from every screen.
 - Keep scope small. No speculative features, settings or abstractions.
 
@@ -66,11 +67,12 @@ Import rules:
 ## Invariants
 
 - **HEAT is derived, never stored.** The completion log is the single source of truth; `foldHeat` replays it from the last reset (`heatCompletions`). Undo removes a completion; nothing else needs repair. A reset stores only its time, never a HEAT value.
-- **Every tunable number lives in `HeatConfig`** (`src/heat/config.ts`). No magic numbers in the engine or UI. Beside it as constants: the gauge's two fixed points, `FULL_HEAT` (100, one full loop of the edge) and `MAX_HEAT` (120, the ceiling of Surge), and the Effort and Cooling steps.
+- **Every tunable number lives in `HeatConfig`** (`src/heat/config.ts`). No magic numbers in the engine or UI. Beside it as constants: the gauge's two fixed points, `FULL_HEAT` (100, one full loop of the edge) and `MAX_HEAT` (120, the ceiling of Surge), the Effort and Cooling steps, and `MONTHLY_EARLY_DAYS`, a rule of the calendar.
 - **Priority and Friction are a share of the task's own reward**: 20%, 30%, and 50% for both. The shares add, never multiply, and apply after the area factor and warmth, so they shrink with the area's diminishing returns. Use these names everywhere; Important and Avoided are the old ones.
-- **Completions are immutable facts** (when, which item, area, tags, warmth, day), never scores. Editing or deleting an item later must not rewrite past HEAT.
-- **"Done" is derived** from the completion log. Tasks have no `completedAt`; a routine is done today if the log holds a completion for today.
-- **Routine warmth is derived**, never stored as a running value. Only `warmthBase` is saved, and it is re-snapshotted when a schedule changes.
+- **Completions are immutable facts** (when, which item, area, tags, warmth, day, and for a routine the date it counted for), never scores. Editing or deleting an item later must not rewrite past HEAT.
+- **"Done" is derived** from the completion log. Tasks have no `completedAt`. A routine is done when the log holds a completion for the date it is on now (`occurrence`), or one made today. Each date stays open until the next one comes round (`src/heat/schedule.ts`).
+- **Routine warmth is derived**, never stored as a running value. Only `warmthBase` is saved, and it is re-snapshotted when a schedule changes. Warmth reads the dates completions counted for, not the days they were made on.
+- **Dates and times are wall-clock values.** A task's `date` is a day key and its `time` is `'HH:MM'`; neither is converted between time zones, and a time needs a date. A monthly day the month lacks falls on its last day, so 31 means the last day.
 - **Screens list `ListItem`s** (`src/data/selectors.ts`), one shape for tasks and routines. A task and the routine made from it share an id.
 - **Areas and projects are `Place`s**, flattened in reading order by `places()`. An item's area always matches its project's area; the reducer enforces it, and scoring only looks at the area.
 - **View preferences are not data.** Which sections are folded lives in localStorage (`src/app/collapsed.ts`), outside the state document and its backups.

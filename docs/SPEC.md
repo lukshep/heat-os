@@ -21,13 +21,22 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 ## Sections
 
-**Today** shows suggested tasks and routines. Suggestions are every routine scheduled today plus a few tasks chosen by how much HEAT they would add. Each pick assumes the earlier ones are done, which spreads suggestions across areas. A suggestion can be swapped for the next candidate. There is no completed state for the day; when suggestions run out the list is empty.
+**Today** shows suggested tasks and routines. Suggestions are every routine that is due, late ones included, plus a few tasks chosen by how much HEAT they would add. Each pick assumes the earlier ones are done, which spreads suggestions across areas. A suggestion can be swapped for the next candidate. There is no completed state for the day; when suggestions run out the list is empty.
 
 **Projects** shows areas, each holding tasks, routines and arbitrarily nested projects, as one tree whose sections fold shut. Projects are organisational only and have no progress. Any item can be moved to the Inbox, to the top of an area, or into any project, and an item in a project always belongs to that project's area.
 
 **Inbox** is frictionless capture. An inbox item is a task with no area and no project; organising it means giving it a home.
 
-**Routines** are tasks that repeat. Giving a filed task one or more weekdays makes it a routine; clearing them makes it a one-off task again. A routine must live in an area. On Today it appears on its scheduled days until it is done. In its area it is always listed, shown as done for the rest of the day once completed, and can be completed on an unscheduled day too.
+**Routines** are tasks that repeat, weekly on chosen weekdays or monthly on chosen days of the month. Giving a filed task one or more days makes it a routine; clearing them makes it a one-off task again. A routine must live in an area.
+
+- **Each date stays open until the next one comes round.** On Today a routine appears from its date until it is done, late ones included. In its area it is always listed, and once done it shows a check until its next date.
+- **A late completion counts in full** for the date it missed. A date still not done when the next one comes is a miss, and nothing is shown.
+- **A routine counts once a day, and each date once.** Before its first date, a new routine (or one whose days just changed) can still be completed for HEAT, without warmth.
+- **A monthly date opens up to a week early** (`MONTHLY_EARLY_DAYS`) once the one before it is done, but never before the day after it, so a bill can be ticked when it is paid. Today lists it only from its date.
+- **There is no moving a single date.** Lateness is covered by the open window, and changing the days changes the routine from today on, keeping the warmth earned. A date still open when the days change counts if it was done and is dropped without a miss if not.
+- **Only a completion made today can be taken back from the row.** An older one would change HEAT on an earlier day. The Undo toast is unchanged.
+
+The editor offers weekdays only until M14 adds the monthly picker; the rules above already hold for both.
 
 **Settings** holds the hour a new day starts, Effort and Cooling, the backup, and a way to reset HEAT. Effort, Cooling and the reset each ask for confirmation first, and their steps have names, never numbers.
 
@@ -46,16 +55,23 @@ interface Meta { id: ID; createdAt: number; updatedAt: number; deletedAt: number
 interface Area    extends Meta { name: string; order: number }
 interface Project extends Meta { name: string; areaId: ID; parentId: ID | null; order: number }
 
+type ClockTime = string; // 'HH:MM', 24-hour wall-clock time, never shifted between time zones
+
 interface Task extends Meta {
   title: string; note?: string;
   areaId: ID | null; projectId: ID | null;   // both null = Inbox
   priority: boolean; friction: boolean;
+  date: DayKey | null;                       // the planned day, not a deadline
+  time: ClockTime | null;                    // only with a date
 }
 
 interface Routine extends Meta {
   title: string; areaId: ID; projectId: ID | null;
   priority: boolean; friction: boolean;
-  schedule: { days: number[] };              // weekdays 0-6 (0 = Sunday); all seven = daily
+  time: ClockTime | null;
+  schedule:
+    | { every: 'week'; days: number[] }      // weekdays 0-6 (0 = Sunday); all seven = daily
+    | { every: 'month'; days: number[] };    // days 1-31; 31 = the last day
   warmthBase: { warmth: number; missRun: number; asOf: DayKey };
 }
 
@@ -64,7 +80,7 @@ interface Completion extends Meta {          // activity history
   itemId: ID; kind: 'task' | 'routine';
   areaId: ID | null; priority: boolean; friction: boolean;
   warmth: number;                            // routine warmth when completed; 0 for tasks
-  scheduled: boolean;                        // routine: was this a scheduled day
+  occurrence: DayKey | null;                 // routine: the date it counted for; null for tasks
 }
 
 interface AppState {
@@ -86,13 +102,15 @@ interface AppState {
 - Deleting a project moves what it held up one level. Nothing is deleted with it.
 - "Done" is derived from the completion log. Tasks have no `completedAt`.
 - Completions record facts, not scores, and snapshot everything needed to score them. Editing or deleting an item later never changes past HEAT.
-- Routine warmth is derived by walking scheduled days after `warmthBase.asOf` against the days the routine was completed. Editing a schedule re-snapshots the base so history is not reinterpreted.
-- A routine keeps the id of the task it was made from, and a task made from a routine keeps the routine's id. The record it left behind is soft-deleted, so an id is live in at most one of the two collections.
-- A routine counts once per day. Its completion records the warmth it had at that moment and whether the day was scheduled.
+- Routine warmth is derived by walking the routine's dates after `warmthBase.asOf`. Each is settled once the next has come: kept if a completion counted for it (`occurrence`), missed if not. Editing a schedule re-snapshots the base so history is not reinterpreted.
+- A routine keeps the id of the task it was made from, and a task made from a routine keeps the routine's id. The record it left behind is soft-deleted, so an id is live in at most one of the two collections. A routine keeps the task's time but not its date; a task made from a routine has neither.
+- A routine counts once per day and once per date. Its completion records the warmth it had at that moment and the date it counted for, which is earlier than `dayKey` when done late and later when a monthly one is done early. A completion before the routine's first date counts for no date.
+- A task's `date` is a planned day, not a deadline. Once it has passed, the task waits on Today until it is done or given another day; nothing is overdue. A time needs a date, so clearing the date clears the time. Dates and times are wall-clock values: changing the day start or travelling never moves them.
+- A monthly day the month does not have falls on its last day, so the 30th is 28 February and 31 always means the last day. Two days landing on one date count once.
 - `settings` holds the parts of the HEAT config a person can change: the hour a new day starts (midnight to 8 am), and Effort and Cooling. Everything else in the config is fixed by the build. A new day start applies from then on.
 - `settings.tuning` is every change of Effort and Cooling, oldest first, each with the moment it was made. Before the first both were Standard, and the last is in force now. The log is kept rather than just the current values because HEAT is replayed with whichever settings were in force at each moment.
 - `heatResetAt` is when HEAT was last reset. HEAT counts only completions after it. The completion log itself is untouched, so what was done stays done.
-- The saved format is at version 5. Version 1, from before settings existed, version 2, which also held the position of the line that used to be reached each day, version 3, from before Effort, Cooling and the reset, and version 4, which saved the tags as `important` and `avoided`, are upgraded on load. The upgraded shape is written at the next change.
+- The saved format is at version 6. Version 1, from before settings existed, version 2, which also held the position of the line that used to be reached each day, version 3, from before Effort, Cooling and the reset, version 4, which saved the tags as `important` and `avoided`, and version 5, from before dates, times and monthly routines, are upgraded on load. The version 5 upgrade gives tasks no date or time, makes every schedule weekly, and takes a completion's date from whether its day was scheduled, so neither past HEAT nor warmth moves. The upgraded shape is written at the next change.
 - `deferred` holds the tasks swapped out of Today's suggestions. It only counts on the day it was made and is not meant to sync.
 - Sync readiness consists of stable IDs, `updatedAt`, soft-delete tombstones, an append-only log, and a fold that ignores duplicates (one completion per task; one per routine per day).
 
@@ -197,10 +215,12 @@ Settings can reset HEAT to cold. The time is saved, and HEAT counts only complet
 
 Warmth is a hidden value from 0 to 1 per routine. The area part of a fully warm routine is worth twice a plain task's.
 
-- Each completion on a scheduled day closes 25% of the gap to full warmth. Warmth is 0.76 after five completions and 0.94 after ten.
-- A missed scheduled day removes a share of the warmth that is left: 20% for one miss, 80% for the second in a row, all of it for the third. From full warmth that is 0.80, then 0.16, then 0.
+- Each date that is done closes 25% of the gap to full warmth. Warmth is 0.76 after five completions and 0.94 after ten.
+- A date not done by the time the next one comes removes a share of the warmth that is left: 20% for one miss, 80% for the second in a row, all of it for the third. From full warmth that is 0.80, then 0.16, then 0.
+- A date is settled when the next one comes, not at the end of its day, so a late completion counts in full. Daily routines are settled each morning, as before.
 - Warmth settles lower the more often a routine is skipped: around 0.64 to 0.80 when skipped every third day, 0.50 to 0.63 when skipped every other day.
-- A completion on an unscheduled day earns HEAT but does not change warmth.
+- A completion before a routine's first date earns HEAT but does not change warmth.
+- Monthly routines follow the same rules, so they warm slowly: 0.76 after about five months. At most twelve completions a year, they barely move HEAT.
 - Warmth, miss counts and streaks are never shown.
 
 ### Colour
@@ -235,7 +255,8 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 | No landmark on the edge | Without a mark, 70 and 85 are a short distance apart on a featureless line | Colour carries the level. Watch whether position still reads |
 | Warm routines carry a lot | Three warm routines and three tasks settle at 87, above a balanced day of eight tasks | Intended reward for consistency; the full-warmth bonus is the lever |
 | Time off resets routines | Three missed days in a row leave a routine cold | Intended. A routine pause is a later feature |
-| Cadence asymmetry | A daily routine warms in a week, a weekly one in two months | Observe; the step could scale with cadence |
+| Cadence asymmetry | A daily routine warms in a week, a weekly one in two months, a monthly one in about five months | Observe; the step could scale with cadence. Monthly routines are worth little to HEAT either way |
+| Late completions | Each date stays open until the next, so a twice-weekly routine done a day late keeps its warmth | Intended: consistency is doing each one, not doing it on the dot. Daily routines are unaffected, and a routine counts once per date, so there are no extra off-day completions |
 | Retroactive retuning | Changing the defaults in a new build rewrites current HEAT, because it is derived. The Surge change raised everyone's current HEAT when it landed | Wanted in the simulator. A person's own Effort and Cooling apply from the moment they change, so they never rewrite it |
 | Settings as a lever | Switching to Easier for a burst of work and back again keeps what was earned under Easier | Accepted for a personal app. The confirmation is the friction |
 | Stacked settings | Easier and Slower together put a balanced day at 99, just short of a full gauge | Accepted: both were chosen. The scenario tests keep a balanced day out of Surge on every combination |

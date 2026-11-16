@@ -1,9 +1,10 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { ItemPatch } from '../data/reducer';
 import type { ListItem, Place } from '../data/selectors';
+import type { Schedule } from '../heat/schedule';
 import { CheckIcon } from './icons';
 import { heatColor } from './temperature';
-import { describeDays, weekdayName, weekdayOrder } from './weekdays';
+import { describeSchedule, weekdayName, weekdayOrder } from './weekdays';
 
 interface Props {
   item: ListItem;
@@ -21,8 +22,8 @@ interface Props {
   /** Takes back today's completion of a routine that is shown as done. */
   onUndo: () => void;
   onUpdate: (patch: ItemPatch) => void;
-  /** Sets the weekdays it repeats on. Any days make it a routine; none make it a one-off task. */
-  onSetDays: (days: number[]) => void;
+  /** Sets how it repeats. Any days make it a routine; none make it a one-off task. */
+  onSetSchedule: (schedule: Schedule) => void;
   onDelete: () => void;
   /** Where the item lives, shown on screens that mix areas. */
   context?: string | undefined;
@@ -41,7 +42,9 @@ export function ItemRow(props: Props) {
   const [leaving, setLeaving] = useState(false);
   // Fixed at the moment the row appears, so a later re-render cannot cut the animation short.
   const [arrived] = useState(props.arrives);
-  const done = item.doneCompletionId !== null;
+  const { done } = item;
+  // Only a completion made today can be taken back from the row.
+  const undoable = item.undoId !== null;
 
   function complete() {
     if (leaving) return;
@@ -52,7 +55,7 @@ export function ItemRow(props: Props) {
 
   const meta = [
     context,
-    item.kind === 'routine' && describeDays(item.days),
+    item.repeat && describeSchedule(item.repeat),
     item.priority && 'Priority',
     item.friction && 'Friction',
   ].filter(Boolean);
@@ -69,7 +72,8 @@ export function ItemRow(props: Props) {
           <button
             className="row-check"
             type="button"
-            aria-label={done ? `Undo: ${item.title}` : `Complete: ${item.title}`}
+            aria-label={done ? (undoable ? `Undo: ${item.title}` : `Done: ${item.title}`) : `Complete: ${item.title}`}
+            disabled={done && !undoable}
             onClick={done ? props.onUndo : complete}
           >
             <span className="row-check-ring">{done && <CheckIcon />}</span>
@@ -94,8 +98,9 @@ function homeKey(item: ListItem): string {
   return item.projectId === null ? `area:${item.areaId}` : `project:${item.projectId}`;
 }
 
-function Editor({ item, places, onUpdate, onSetDays, onDelete }: Props) {
+function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
   const [title, setTitle] = useState(item.title);
+  const weekdays = item.repeat?.every === 'week' ? item.repeat.days : [];
 
   function commitTitle() {
     const next = title.trim();
@@ -104,7 +109,8 @@ function Editor({ item, places, onUpdate, onSetDays, onDelete }: Props) {
   }
 
   function toggleDay(day: number) {
-    onSetDays(item.days.includes(day) ? item.days.filter((other) => other !== day) : [...item.days, day]);
+    const days = weekdays.includes(day) ? weekdays.filter((other) => other !== day) : [...weekdays, day];
+    onSetSchedule({ every: 'week', days });
   }
 
   return (
@@ -162,7 +168,7 @@ function Editor({ item, places, onUpdate, onSetDays, onDelete }: Props) {
         ) : (
           <div className="chips" role="group" aria-label="Repeat on">
             {weekdayOrder().map((day) => (
-              <Chip key={day} pressed={item.days.includes(day)} onClick={() => toggleDay(day)}>
+              <Chip key={day} pressed={weekdays.includes(day)} onClick={() => toggleDay(day)}>
                 {weekdayName(day)}
               </Chip>
             ))}

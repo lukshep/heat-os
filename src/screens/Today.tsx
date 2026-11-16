@@ -16,10 +16,9 @@ const SUGGESTION_COUNT = 5;
 export function Today({ view, onComplete }: Props) {
   const actions = useActions();
 
-  // Every routine due today comes first, in the same order each day. They cannot be swapped away.
-  const routines = view.items.filter(
-    (item) => item.kind === 'routine' && item.dueToday && item.doneCompletionId === null,
-  );
+  // Every routine that is due comes first, late ones included, in the same order each day.
+  // They cannot be swapped away.
+  const routines = view.items.filter((item) => item.kind === 'routine' && item.due);
 
   const setAside = deferredToday(view.state, view.today);
   const pool = view.items.filter((item) => item.kind === 'task' && !setAside.has(item.id)).map(candidate);

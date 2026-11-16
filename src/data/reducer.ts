@@ -1,8 +1,10 @@
 import type { Tuning } from '../heat/config';
-import type { DayKey } from '../heat/day';
+import { isDayKey, type DayKey } from '../heat/day';
+import { LAST_DAY, type Schedule } from '../heat/schedule';
 import type { WarmthBase } from '../heat/warmth';
 import {
   currentTuning,
+  isClockTime,
   normalizeSettings,
   type AppState,
   type Area,
@@ -18,8 +20,13 @@ import {
  * What can be edited on a task or a routine. To move it, give `projectId` (its area follows)
  * or give `areaId` alone for the top of an area; a null `areaId` is the Inbox. A routine
  * ignores a move to the Inbox: it must have a home.
+ *
+ * `date` is a task's planned day, and clearing it clears the time too. A time only sticks to a
+ * task that has a date. A routine takes a time but never a date.
  */
-export type ItemPatch = Partial<Pick<Task, 'title' | 'areaId' | 'projectId' | 'priority' | 'friction'>>;
+export type ItemPatch = Partial<
+  Pick<Task, 'title' | 'areaId' | 'projectId' | 'priority' | 'friction' | 'date' | 'time'>
+>;
 
 /**
  * Everything that can change the state. Actions carry their own ids, times and day keys,
@@ -27,15 +34,24 @@ export type ItemPatch = Partial<Pick<Task, 'title' | 'areaId' | 'projectId' | 'p
  * action always produces the same state.
  */
 export type Action =
-  | { type: 'task/add'; id: ID; at: number; title: string; areaId: ID | null; projectId?: ID | null }
+  | {
+      type: 'task/add';
+      id: ID;
+      at: number;
+      title: string;
+      areaId: ID | null;
+      projectId?: ID | null;
+      /** A day to plan it for. */
+      date?: DayKey | null;
+    }
   | { type: 'task/update'; id: ID; at: number; patch: ItemPatch }
   | { type: 'task/delete'; id: ID; at: number }
   | { type: 'task/complete'; id: ID; at: number; dayKey: DayKey; taskId: ID }
-  /** Turns a filed task into a routine due on `days`. The routine keeps the task's id. */
-  | { type: 'task/makeRoutine'; id: ID; at: number; days: number[]; asOf: DayKey }
+  /** Turns a filed task into a routine. It keeps the task's id and time, but not its date. */
+  | { type: 'task/makeRoutine'; id: ID; at: number; schedule: Schedule; asOf: DayKey }
   | { type: 'routine/update'; id: ID; at: number; patch: ItemPatch }
   /** Changes the schedule. `warmthBase` is the warmth earned so far, so history is not reinterpreted. */
-  | { type: 'routine/setDays'; id: ID; at: number; days: number[]; warmthBase: WarmthBase }
+  | { type: 'routine/setSchedule'; id: ID; at: number; schedule: Schedule; warmthBase: WarmthBase }
   /** Turns a routine back into a one-off task with the same id. */
   | { type: 'routine/makeTask'; id: ID; at: number }
   | { type: 'routine/delete'; id: ID; at: number }
@@ -45,9 +61,10 @@ export type Action =
       at: number;
       dayKey: DayKey;
       routineId: ID;
-      /** The routine's warmth at this moment, and whether today is a scheduled day. */
+      /** The routine's warmth at this moment. */
       warmth: number;
-      scheduled: boolean;
+      /** The date it counts for, or null when none is open yet. */
+      occurrence: DayKey | null;
     }
   | { type: 'completion/undo'; id: ID; at: number }
   | { type: 'area/add'; id: ID; at: number; name: string }
@@ -71,20 +88,33 @@ function isLive<T extends { deletedAt: number | null }>(record: T | undefined): 
   return record !== undefined && record.deletedAt === null;
 }
 
-function hasLiveCompletion(state: AppState, kind: Completion['kind'], itemId: ID, dayKey?: DayKey): boolean {
+function hasLiveCompletion(
+  state: AppState,
+  kind: Completion['kind'],
+  itemId: ID,
+  matches: (completion: Completion) => boolean = () => true,
+): boolean {
   return Object.values(state.completions).some(
     (completion) =>
-      completion.kind === kind &&
-      completion.itemId === itemId &&
-      completion.deletedAt === null &&
-      (dayKey === undefined || completion.dayKey === dayKey),
+      completion.kind === kind && completion.itemId === itemId && completion.deletedAt === null && matches(completion),
   );
 }
 
-/** Weekday numbers as a schedule stores them: whole, 0 to 6, unique and in order. */
-function cleanDays(days: readonly number[]): number[] {
-  return [...new Set(days.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))].sort((a, b) => a - b);
+/**
+ * A schedule as it is stored: whole days inside its range (0 to 6 for weekdays, 1 to 31 for
+ * days of the month), each once and in order. Null when no day is left.
+ */
+function cleanSchedule(schedule: Schedule): Schedule | null {
+  const [low, high] = schedule.every === 'week' ? [0, 6] : [1, LAST_DAY];
+  const days = [...new Set(schedule.days.filter((day) => Number.isInteger(day) && day >= low && day <= high))].sort(
+    (a, b) => a - b,
+  );
+  if (days.length === 0) return null;
+  return schedule.every === 'week' ? { every: 'week', days } : { every: 'month', days };
 }
+
+/** A date from an action, or null when it is not a real one. */
+const dayOrNull = (value: DayKey | null | undefined): DayKey | null => (isDayKey(value) ? value : null);
 
 interface Home {
   areaId: ID | null;
@@ -114,12 +144,16 @@ function requestedHome(state: AppState, patch: ItemPatch): Home | null {
   return resolveHome(state, patch.areaId, null);
 }
 
-/** Applies the shared fields of a patch. Returns the same record type it was given. */
+/**
+ * Applies the shared fields of a patch. Returns the same record type it was given. A time that
+ * is not a real one is ignored.
+ */
 function patched<T extends Task | Routine>(record: T, patch: ItemPatch, at: number): T {
   const next = { ...record, updatedAt: at };
   if (patch.title !== undefined && patch.title.trim()) next.title = patch.title.trim();
   if (patch.priority !== undefined) next.priority = patch.priority;
   if (patch.friction !== undefined) next.friction = patch.friction;
+  if (patch.time === null || isClockTime(patch.time)) next.time = patch.time;
   return next;
 }
 
@@ -135,6 +169,9 @@ function demote(state: AppState, routine: Routine, areaId: ID | null, at: number
     projectId: areaId === null ? null : routine.projectId,
     priority: routine.priority,
     friction: routine.friction,
+    // A task has a time only on a planned day, and a routine leaves no date behind.
+    date: null,
+    time: null,
   };
   return {
     tasks: { ...state.tasks, [task.id]: task },
@@ -158,6 +195,8 @@ export function reduce(state: AppState, action: Action): AppState {
         ...home,
         priority: false,
         friction: false,
+        date: dayOrNull(action.date),
+        time: null,
       };
       return { ...state, tasks: { ...state.tasks, [task.id]: task } };
     }
@@ -168,6 +207,9 @@ export function reduce(state: AppState, action: Action): AppState {
       const next = patched(task, action.patch, action.at);
       const home = requestedHome(state, action.patch);
       if (home) Object.assign(next, home);
+      if (action.patch.date === null || isDayKey(action.patch.date)) next.date = action.patch.date;
+      // A time belongs to a planned day; with no day, there is no time.
+      if (next.date === null) next.time = null;
       return { ...state, tasks: { ...state.tasks, [task.id]: next } };
     }
 
@@ -196,16 +238,16 @@ export function reduce(state: AppState, action: Action): AppState {
         priority: task.priority,
         friction: task.friction,
         warmth: 0,
-        scheduled: false,
+        occurrence: null,
       };
       return { ...state, completions: { ...state.completions, [completion.id]: completion } };
     }
 
     case 'task/makeRoutine': {
       const task = state.tasks[action.id];
-      const days = cleanDays(action.days);
+      const schedule = cleanSchedule(action.schedule);
       // A routine needs a home, so an Inbox task has to be filed first.
-      if (!isLive(task) || task.areaId === null || days.length === 0) return state;
+      if (!isLive(task) || task.areaId === null || schedule === null) return state;
       if (hasLiveCompletion(state, 'task', task.id)) return state;
       const routine: Routine = {
         id: task.id,
@@ -217,7 +259,8 @@ export function reduce(state: AppState, action: Action): AppState {
         projectId: task.projectId,
         priority: task.priority,
         friction: task.friction,
-        schedule: { days },
+        time: task.time,
+        schedule,
         warmthBase: { warmth: 0, missRun: 0, asOf: action.asOf },
       };
       return {
@@ -239,14 +282,14 @@ export function reduce(state: AppState, action: Action): AppState {
       return { ...state, routines: { ...state.routines, [routine.id]: next } };
     }
 
-    case 'routine/setDays': {
+    case 'routine/setSchedule': {
       const routine = state.routines[action.id];
-      const days = cleanDays(action.days);
-      if (!isLive(routine) || days.length === 0) return state;
+      const schedule = cleanSchedule(action.schedule);
+      if (!isLive(routine) || schedule === null) return state;
       const next: Routine = {
         ...routine,
         updatedAt: action.at,
-        schedule: { days },
+        schedule,
         warmthBase: action.warmthBase,
       };
       return { ...state, routines: { ...state.routines, [routine.id]: next } };
@@ -270,8 +313,12 @@ export function reduce(state: AppState, action: Action): AppState {
     case 'routine/complete': {
       const routine = state.routines[action.routineId];
       if (!isLive(routine) || state.completions[action.id]) return state;
-      // Once a day is all a routine can count for.
-      if (hasLiveCompletion(state, 'routine', routine.id, action.dayKey)) return state;
+      // A routine counts once a day, and each of its dates counts once.
+      const { dayKey } = action;
+      const occurrence = dayOrNull(action.occurrence);
+      const taken = (completion: Completion) =>
+        completion.dayKey === dayKey || (occurrence !== null && completion.occurrence === occurrence);
+      if (hasLiveCompletion(state, 'routine', routine.id, taken)) return state;
       const completion: Completion = {
         id: action.id,
         createdAt: action.at,
@@ -285,7 +332,7 @@ export function reduce(state: AppState, action: Action): AppState {
         priority: routine.priority,
         friction: routine.friction,
         warmth: Math.min(1, Math.max(0, action.warmth)),
-        scheduled: action.scheduled,
+        occurrence,
       };
       return { ...state, completions: { ...state.completions, [completion.id]: completion } };
     }

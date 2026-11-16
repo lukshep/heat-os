@@ -1,6 +1,7 @@
 import { DEFAULT_CONFIG, STANDARD_TUNING, type Tuning } from '../heat/config';
 import type { DayKey } from '../heat/day';
-import type { Schedule, WarmthBase } from '../heat/warmth';
+import type { Schedule } from '../heat/schedule';
+import type { WarmthBase } from '../heat/warmth';
 
 export type ID = string;
 
@@ -24,6 +25,17 @@ export interface Project extends Meta {
   order: number;
 }
 
+/**
+ * A time of day as 'HH:MM' on a 24-hour clock. It is the time on the wall wherever the person
+ * is, so it never moves with the time zone.
+ */
+export type ClockTime = string;
+
+/** True for a time written as 'HH:MM', from 00:00 to 23:59. */
+export function isClockTime(value: unknown): value is ClockTime {
+  return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 export interface Task extends Meta {
   title: string;
   note?: string;
@@ -32,6 +44,13 @@ export interface Task extends Meta {
   projectId: ID | null;
   priority: boolean;
   friction: boolean;
+  /**
+   * The day it is planned for, or null. A planned day, not a deadline: once it has passed, the
+   * task simply waits on Today until it is done or given another day.
+   */
+  date: DayKey | null;
+  /** A time on that day, or null. A task only has a time when it has a date. */
+  time: ClockTime | null;
 }
 
 export interface Routine extends Meta {
@@ -40,6 +59,8 @@ export interface Routine extends Meta {
   projectId: ID | null;
   priority: boolean;
   friction: boolean;
+  /** A time of day it is done at, or null. */
+  time: ClockTime | null;
   schedule: Schedule;
   warmthBase: WarmthBase;
 }
@@ -59,8 +80,12 @@ export interface Completion extends Meta {
   friction: boolean;
   /** Routine warmth when completed; 0 for tasks. */
   warmth: number;
-  /** For a routine, whether this was a scheduled day. */
-  scheduled: boolean;
+  /**
+   * For a routine, the date it counted for, which can be earlier than `dayKey` when it was done
+   * late, or later when a monthly one was done early. Null for a task, and for a routine done
+   * before its first date, which earns HEAT but leaves warmth alone.
+   */
+  occurrence: DayKey | null;
 }
 
 /** Tasks set aside from Today's suggestions for the rest of one day. Local to this device. */
@@ -137,9 +162,11 @@ export interface AppState {
  * Version 2 added `settings`. Version 3 removed the threshold from them, when the line to
  * reach each day was dropped. Version 4 added Effort and Cooling to settings, as dated
  * changes, and the time HEAT was last reset. Version 5 renamed the tags on tasks, routines
- * and completions: `important` became `priority` and `avoided` became `friction`.
+ * and completions: `important` became `priority` and `avoided` became `friction`. Version 6
+ * gave tasks a date and a time and routines a time, made schedules weekly or monthly, and
+ * replaced a completion's `scheduled` with the date it counted for.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const SEED_AREA_NAMES = ['Work', 'Health', 'Home', 'People', 'Growth'];
 

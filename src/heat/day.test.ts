@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, dayKeyAt, daysBetween, weekdayOf } from './day';
+import { addDays, dayKeyAt, dayOfMonth, daysBetween, daysInMonth, isDayKey, weekdayOf } from './day';
 
 describe('dayKeyAt', () => {
   it('starts a new day at the day-start hour, not at midnight', () => {
@@ -46,5 +46,35 @@ describe('day arithmetic', () => {
   it('orders keys correctly as plain strings', () => {
     expect('2026-01-31' < '2026-02-01').toBe(true);
     expect('2026-12-31' < '2027-01-01').toBe(true);
+  });
+
+  it('reads the day of the month', () => {
+    expect(dayOfMonth('2026-01-05')).toBe(5);
+    expect(dayOfMonth('2026-12-31')).toBe(31);
+  });
+
+  it('knows how long each month is, leap years included', () => {
+    expect(daysInMonth('2026-01-15')).toBe(31);
+    expect(daysInMonth('2026-02-01')).toBe(28);
+    expect(daysInMonth('2028-02-10')).toBe(29);
+    expect(daysInMonth('2100-02-10')).toBe(28);
+    expect(daysInMonth('2026-04-30')).toBe(30);
+    expect(daysInMonth('2026-12-01')).toBe(31);
+  });
+});
+
+describe('isDayKey', () => {
+  it('accepts real days in the saved format', () => {
+    expect(isDayKey('2026-01-05')).toBe(true);
+    expect(isDayKey('2028-02-29')).toBe(true);
+  });
+
+  it('refuses anything else', () => {
+    expect(isDayKey('2026-02-30')).toBe(false);
+    expect(isDayKey('2026-13-01')).toBe(false);
+    expect(isDayKey('2026-1-5')).toBe(false);
+    expect(isDayKey('5 January')).toBe(false);
+    expect(isDayKey(20260105)).toBe(false);
+    expect(isDayKey(null)).toBe(false);
   });
 });

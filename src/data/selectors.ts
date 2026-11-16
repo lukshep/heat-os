@@ -1,9 +1,20 @@
 import { DEFAULT_CONFIG, STANDARD_TUNING, tuned, type HeatConfig } from '../heat/config';
 import type { DayKey } from '../heat/day';
 import type { ConfigTimeline, Scorable } from '../heat/engine';
+import { occurrenceNow, type Schedule } from '../heat/schedule';
 import type { Candidate } from '../heat/suggest';
-import { isScheduledOn, warmthAt, type WarmthState } from '../heat/warmth';
-import { currentTuning, type AppState, type Area, type Completion, type ID, type Routine, type Settings, type Task } from './model';
+import { warmthAt, type WarmthState } from '../heat/warmth';
+import {
+  currentTuning,
+  type AppState,
+  type Area,
+  type ClockTime,
+  type Completion,
+  type ID,
+  type Routine,
+  type Settings,
+  type Task,
+} from './model';
 
 /** The tuned defaults with the person's own day start, before Effort and Cooling. */
 function personal(settings: Settings): HeatConfig {
@@ -160,29 +171,64 @@ export function deferredToday(state: AppState, today: DayKey): ReadonlySet<ID> {
   return new Set(state.deferred.dayKey === today ? state.deferred.taskIds : []);
 }
 
-/** For each routine, the days it was completed and the completion that did it. */
-export function routineDays(state: AppState): Map<ID, Map<DayKey, ID>> {
-  const days = new Map<ID, Map<DayKey, ID>>();
+/** What a routine's live completions say: the dates they counted for, and the day each was made on. */
+export interface RoutineLog {
+  /** Dates of its schedule that have been done. */
+  kept: ReadonlySet<DayKey>;
+  /** The completion made on each day. A routine counts once a day, so there is at most one. */
+  byDay: ReadonlyMap<DayKey, ID>;
+}
+
+const EMPTY_LOG: RoutineLog = { kept: new Set(), byDay: new Map() };
+
+/** Each routine's live completions, by routine id. */
+export function routineLogs(state: AppState): Map<ID, RoutineLog> {
+  const logs = new Map<ID, { kept: Set<DayKey>; byDay: Map<DayKey, ID> }>();
   for (const completion of Object.values(state.completions)) {
     if (completion.kind !== 'routine' || completion.deletedAt !== null) continue;
-    const forRoutine = days.get(completion.itemId) ?? new Map<DayKey, ID>();
-    forRoutine.set(completion.dayKey, completion.id);
-    days.set(completion.itemId, forRoutine);
+    let log = logs.get(completion.itemId);
+    if (!log) {
+      log = { kept: new Set(), byDay: new Map() };
+      logs.set(completion.itemId, log);
+    }
+    if (completion.occurrence !== null) log.kept.add(completion.occurrence);
+    log.byDay.set(completion.dayKey, completion.id);
   }
-  return days;
+  return logs;
+}
+
+/** One routine's live completions. */
+export function routineLog(state: AppState, routineId: ID): RoutineLog {
+  return routineLogs(state).get(routineId) ?? EMPTY_LOG;
 }
 
 /**
- * A routine's warmth at the start of `today`: every scheduled day since its base is settled
- * as kept or missed. Today stays open until it is over.
+ * A routine's warmth at the start of `today`. Each date since its base is settled as kept or
+ * missed once the next one has come, so the latest stays open and can still be done late.
  */
-export function routineWarmth(
-  routine: Routine,
-  completedDays: ReadonlyMap<DayKey, ID> | undefined,
-  today: DayKey,
-  config: HeatConfig,
-): WarmthState {
-  return warmthAt(routine.warmthBase, routine.schedule, new Set(completedDays?.keys()), today, config);
+export function routineWarmth(routine: Routine, log: RoutineLog, today: DayKey, config: HeatConfig): WarmthState {
+  return warmthAt(routine.warmthBase, routine.schedule, log.kept, today, config);
+}
+
+/** Where a routine stands today: which date completing it would count for, and whether it is done. */
+export interface RoutineToday {
+  /** The date a completion now would count for, or null when none is open. */
+  occurrence: DayKey | null;
+  /** Its date has come and it is not done yet, late ones included. */
+  due: boolean;
+  /** Done for the date it is on now, or already completed today. */
+  done: boolean;
+  /** The completion made today, if any. */
+  todayId: ID | null;
+}
+
+export function routineToday(routine: Routine, log: RoutineLog, today: DayKey): RoutineToday {
+  const todayId = log.byDay.get(today) ?? null;
+  const now = occurrenceNow(routine.schedule, routine.warmthBase.asOf, log.kept, today);
+  // Once a day is all a routine can count for, whatever opens next.
+  if (todayId !== null || now.kind === 'done') return { occurrence: null, due: false, done: true, todayId };
+  if (now.kind === 'waiting') return { occurrence: null, due: false, done: false, todayId };
+  return { occurrence: now.occurrence, due: now.due, done: false, todayId };
 }
 
 /** A task or a routine as the screens list it. Everything a row needs, in one shape. */
@@ -196,19 +242,32 @@ export interface ListItem {
   priority: boolean;
   friction: boolean;
   createdAt: number;
-  /** Weekdays a routine is due on (0 is Sunday). Empty for a task. */
-  days: readonly number[];
+  /** A task's planned day. Null for an undated task and for a routine. */
+  date: DayKey | null;
+  time: ClockTime | null;
+  /** How a routine repeats. Null for a task. */
+  repeat: Schedule | null;
   /** Routine warmth right now, which is never shown, only felt through colour. 0 for a task. */
   warmth: number;
-  /** A routine scheduled for today. Always false for a task. */
-  dueToday: boolean;
-  /** For a routine already done today, the completion to undo. Null otherwise. */
-  doneCompletionId: ID | null;
+  /** A routine whose date has come and is not done yet, late ones included: it belongs on Today. */
+  due: boolean;
+  /** For a routine, the date completing it now would count for, or null when none is open. */
+  occurrence: DayKey | null;
+  /**
+   * A routine done for the date it is on now, or already completed today. Always false for a
+   * task, since done tasks are not listed.
+   */
+  done: boolean;
+  /**
+   * For a routine completed today, the completion its check can take back. An older one is
+   * not undone from the list, because that would change HEAT on an earlier day.
+   */
+  undoId: ID | null;
 }
 
 /** Every routine, then every open task, each oldest first. */
 export function listItems(state: AppState, today: DayKey, config: HeatConfig): ListItem[] {
-  const completed = routineDays(state);
+  const logs = routineLogs(state);
   // An item pointing at a project that is gone is treated as sitting at the top of its area.
   const projectOf = (record: Task | Routine): ID | null => {
     const project = record.projectId === null ? undefined : state.projects[record.projectId];
@@ -216,7 +275,8 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
   };
 
   const routines = liveRoutines(state).map((routine): ListItem => {
-    const days = completed.get(routine.id);
+    const log = logs.get(routine.id) ?? EMPTY_LOG;
+    const now = routineToday(routine, log, today);
     return {
       id: routine.id,
       kind: 'routine',
@@ -226,10 +286,14 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
       priority: routine.priority,
       friction: routine.friction,
       createdAt: routine.createdAt,
-      days: routine.schedule.days,
-      warmth: routineWarmth(routine, days, today, config).warmth,
-      dueToday: isScheduledOn(routine.schedule, today),
-      doneCompletionId: days?.get(today) ?? null,
+      date: null,
+      time: routine.time,
+      repeat: routine.schedule,
+      warmth: routineWarmth(routine, log, today, config).warmth,
+      due: now.due,
+      occurrence: now.occurrence,
+      done: now.done,
+      undoId: now.todayId,
     };
   });
 
@@ -242,10 +306,14 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
     priority: task.priority,
     friction: task.friction,
     createdAt: task.createdAt,
-    days: [],
+    date: task.date,
+    time: task.time,
+    repeat: null,
     warmth: 0,
-    dueToday: false,
-    doneCompletionId: null,
+    due: false,
+    occurrence: null,
+    done: false,
+    undoId: null,
   }));
 
   return [...routines, ...tasks];
