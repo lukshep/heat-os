@@ -28,6 +28,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M17 | Areas | Deployed 2026-11-15; not yet tried on an iPhone |
 | M18 | Daily, an anticlockwise line and a project icon | Deployed 2026-11-15; not yet tried on an iPhone |
 | M19 | Priority first, Friction in stars, saved format version 7 | Deployed 2026-11-15; not yet tried on an iPhone |
+| M20 | Retune: an even area ladder, stronger stars, rings up to the Surge peak | Built 2026-11-15; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -465,6 +466,20 @@ Saved data: version 7. Tasks and routines with Friction get three stars, which e
 
 Verified on a production build at phone size, with a made-up version 6 document given both tags here and there: it loaded and was saved as version 7, with completions at two, three and five stars and none carrying Priority, and tasks with Friction at three stars. Today listed the Priority items first and bold (a task planned for an earlier day, then an undated one with no swap button), then the timed task, the routines, the planned task and one suggestion. Clearing, setting and showing stars on a row; marking a routine Priority moving it to the top; Priority first on an area page. No console errors. Not tried on an iPhone.
 
+### M20 — Retune: an even area ladder, stronger stars, rings up to the Surge peak
+
+Chosen from mockups of the rings under each rule. No change to saved data.
+
+- **Every area starts at 15**, and each further task in it is worth 80% of the one before: 15, 12, 9.6, 7.7. There is no longer a cliff after the first task, and no shrinking bonus for each further area opened (`areaBonusDecay` and the engine's count of opened areas are gone). A fresh area still beats a plain repeat, 15 to 12. The Inbox steps down the same way from 10.
+- **Friction is 20% a star**, so five stars double a task, and a five-star repeat can outweigh a fresh area.
+- **The gain scale is 275**, up from 215, so a balanced day, now 108 points, still settles between 68 and 85.
+- **Rings use the whole gradient.** The hottest item, a fully warm routine with five stars first in its area, is the pale yellow of the Surge peak, and the curve is gentler (0.45, was 0.6), so everyday items sit in the warm middle: a plain first task is red (0.64, was 0.52), and a second in its area 0.58 (was 0.35). A ring's glow stops growing at a full gauge's yellow.
+- **Invariants changed on purpose:** splitting one task into twenty is bounded at five times one task, not four (it pays 4.9); a five-star repeat outweighs a fresh area; five stars on every task of a balanced day reaches Surge (peak 104, 22% of the time) while three stars on everything stays short of it.
+
+HEAT already earned is rescored under the new rules, as at every retune, so the gauge moves once when the update loads. Items given Friction before version 7 have three stars, now worth 60% rather than 30%.
+
+Verified with the simulator (the figures in `docs/SPEC.md`, and every Effort and Cooling step keeping a balanced day out of Surge and a huge day below 100 by morning), and on a production build at phone size with made-up data: each ring's temperature matched its place in the day, a plain first task at 0.64, a second in its area at 0.58, three stars in the Inbox at 0.66, and a cold daily routine with five stars at 0.88, all in red to amber. No console errors. Not tried on an iPhone.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications, reordering areas.
@@ -519,9 +534,13 @@ Cloud sync, routine pause, notifications, reordering areas.
 | 44 | The edge line grows anticlockwise from the top centre, and its tip is a brighter stretch of the line, no wider than it | Decided 2026-11-15 |
 | 45 | Priority earns nothing. It puts an item first in every list, above timed items too, and makes its title bold | Decided 2026-11-15 |
 | 46 | An undated Priority task is always on Today, like a planned one, and cannot be swapped away | Decided 2026-11-15 |
-| 47 | Friction is 0 to 5 stars, each adding 10% of the item's reward. Friction from before is three stars | Decided 2026-11-15 |
+| 47 | Friction is 0 to 5 stars, each adding 10% of the item's reward. Friction from before is three stars | Decided 2026-11-15; the step is now 20% (51) |
 | 48 | Past HEAT is kept when the tags change: old completions carry stars that earn what their tags earned | Decided 2026-11-15 |
 | 49 | New project on an area page is a folder-with-plus icon, not a text button | Decided 2026-11-15 |
+| 50 | Every area's first task is worth the same, and each further one 80% of the one before. No shrinking bonus for further areas | Decided 2026-11-15 |
+| 51 | Friction is 20% a star, so five stars double a task. Stars alone can reach Surge at their limit | Decided 2026-11-15; replaces the 10% of 47 |
+| 52 | Rings use the whole gradient up to the Surge peak, on a gentler curve. The glow stops growing at a full gauge | Decided 2026-11-15; replaces "rows never reach the pale end" |
+| 53 | Splitting a task is bounded at five times one task, not four | Decided 2026-11-15 |
 
 ## Tuning log
 
@@ -545,3 +564,4 @@ Record every change to `DEFAULT_CONFIG` here: date, what changed, why, and which
 | 2026-11-12 | New: Effort steps scale the gain scale by 0.75, 1 and 1.3. Cooling steps shift daily retention by +0.05, 0 and -0.05; Surge retention never drops below the daily rate. `DEFAULT_CONFIG` unchanged | Personal settings (M10). The Effort steps put a light day (Easier) and a heavy day (Harder) where a balanced day sits on Standard. Shifting Surge retention too made Surge permanent for a huge day on Slower |
 | 2026-11-12 | Tags: `importantBonus` and `avoidedBonus` (0.75 each, flat, as a share of a plain task) become `priorityBonus` 0.2 and `frictionBonus` 0.3, as a share of the item's own reward. They add, and multiply the area factor and warmth | Asked for (M11). A balanced day with its first task tagged with both goes from 100 points (peak 90) to 92 (peak 87); a huge day from 194 (peak 107, 43% in Surge) to 175 (peak 104, 27%); tagging everything from 205 (peak 108, 47%) to 127 (peak 96, none) |
 | 2026-11-15 | `priorityBonus` 0.2 and `frictionBonus` 0.3 become `frictionStep` 0.1 a star, up to five (`FRICTION_STARS`). Priority adds nothing | Asked for (M19). Five stars equal the old pair, so every scenario and the hottest ring are unchanged. Friction from before is three stars and earns what it did |
+| 2026-11-15 | `firstInAreaBonus` now carries through an area's repeats (15, 12, 9.6), and `areaBonusDecay` (0.7) is removed. `frictionStep` 0.1 to 0.2. `gainScale` 215 to 275 | Asked for (M20), from mockups of the rings. The new ladder and stars raise a balanced day from 85 to 108 points, so the gain scale holds it at 68 to 85. A light day on Easier still matches a balanced day; a huge day now spends 36% of its time in Surge (was 27%), and five stars on every task 22% (was none) |

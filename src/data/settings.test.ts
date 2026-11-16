@@ -572,10 +572,12 @@ describe('saved data from before Friction had stars (version 6)', () => {
     for (const completion of Object.values(completions)) expect(completion).not.toHaveProperty('priority');
   });
 
-  it('leaves what each completion earned where it was: 30% for Friction, 20% for Priority, 50% for both', () => {
+  it('kept what each completion earned at the 10% a star of the time: 30%, 20% and 50%', () => {
     const completions = parseState(tagged())?.completions ?? {};
+    // M20 later doubled the step, which rescored these along with everything else.
+    const then = { ...DEFAULT_CONFIG, frictionStep: 0.1 };
     const share = (id: string) =>
-      frictionFactor({ areaId: null, friction: completions[id]?.friction ?? -1, warmth: 0 }, DEFAULT_CONFIG) - 1;
+      frictionFactor({ areaId: null, friction: completions[id]?.friction ?? -1, warmth: 0 }, then) - 1;
     expect(share('c1')).toBeCloseTo(0.3, 10);
     expect(share('c2')).toBeCloseTo(0.2, 10);
     expect(share('c3')).toBeCloseTo(0.5, 10);

@@ -31,7 +31,7 @@ const T0 = Date.UTC(2026, 0, 5, 12);
 const FIRST_TASK = 21.752;
 
 const plain: Scorable = { areaId: 'work', friction: 0, warmth: 0 };
-const start: DayPosition = { inArea: 0, areasOpened: 0 };
+const start: DayPosition = { inArea: 0 };
 
 let sequence = 0;
 function fact(overrides: Partial<CompletionFact> = {}): CompletionFact {
@@ -112,24 +112,21 @@ describe('areaFactor', () => {
     expect(areaFactor('work', start, config)).toBe(2);
   });
 
-  it('makes each further completion in the area worth a share of the one before', () => {
-    expect(areaFactor('work', { ...start, inArea: 1 }, config)).toBe(0.5);
-    expect(areaFactor('work', { ...start, inArea: 2 }, config)).toBe(0.25);
-    expect(areaFactor('work', { ...start, inArea: 3 }, config)).toBe(0.125);
+  it('makes each further completion in the area worth a share of the one before, bonus included', () => {
+    expect(areaFactor('work', { ...start, inArea: 1 }, config)).toBe(1);
+    expect(areaFactor('work', { ...start, inArea: 2 }, config)).toBe(0.5);
+    expect(areaFactor('work', { ...start, inArea: 3 }, config)).toBe(0.25);
   });
 
-  it('shrinks the bonus with every area already opened today', () => {
-    expect(areaFactor('work', { ...start, areasOpened: 1 }, config)).toBe(1.5);
-    expect(areaFactor('work', { ...start, areasOpened: 2 }, config)).toBe(1.25);
-    expect(areaFactor('work', { ...start, areasOpened: 20 }, config)).toBeCloseTo(1, 5);
+  it('starts every area the same, however many have been opened', () => {
+    expect(areaFactor('home', start, config)).toBe(areaFactor('work', start, config));
   });
 
-  it('always rates a first task in a new area above a repeat', () => {
-    const repeat = areaFactor('work', { ...start, inArea: 1 }, config);
-    expect(areaFactor('home', { ...start, areasOpened: 50 }, config)).toBeGreaterThan(repeat);
+  it('rates a first task in any area above a repeat', () => {
+    expect(areaFactor('home', start, config)).toBeGreaterThan(areaFactor('work', { ...start, inArea: 1 }, config));
   });
 
-  it('gives items with no area no bonus', () => {
+  it('gives items with no area no bonus, and steps them down the same way', () => {
     expect(areaFactor(null, start, config)).toBe(1);
     expect(areaFactor(null, { ...start, inArea: 1 }, config)).toBe(0.5);
   });
@@ -161,7 +158,7 @@ describe('warmth and Friction', () => {
 describe('pointsFor', () => {
   it('combines area position, warmth and Friction', () => {
     expect(pointsFor(plain, start, config)).toBe(20);
-    expect(pointsFor(plain, { ...start, inArea: 1 }, config)).toBe(5);
+    expect(pointsFor(plain, { ...start, inArea: 1 }, config)).toBe(10);
     expect(pointsFor({ ...plain, warmth: 1 }, start, config)).toBe(40);
     expect(pointsFor({ ...plain, friction: 1 }, start, config)).toBeCloseTo(24, 10);
     expect(pointsFor({ ...plain, areaId: null }, start, config)).toBe(10);
@@ -170,7 +167,7 @@ describe('pointsFor', () => {
   it('scales Friction with the reward, so it shrinks with the area', () => {
     const hard: Scorable = { ...plain, friction: 5 };
     expect(pointsFor(hard, start, config)).toBeCloseTo(40, 10);
-    expect(pointsFor(hard, { ...start, inArea: 1 }, config)).toBeCloseTo(10, 10);
+    expect(pointsFor(hard, { ...start, inArea: 1 }, config)).toBeCloseTo(20, 10);
     for (const inArea of [0, 1, 4, 20]) {
       const position = { ...start, inArea };
       expect(pointsFor(hard, position, config) / pointsFor(plain, position, config)).toBeCloseTo(2, 10);
@@ -184,7 +181,7 @@ describe('pointsFor', () => {
   it('caps what plain tasks in one area can yield in a day', () => {
     let total = 0;
     for (let inArea = 0; inArea < 500; inArea++) total += pointsFor(plain, { ...start, inArea }, config);
-    const ceiling = config.basePoints * (1 / (1 - config.repeatDecay) + config.firstInAreaBonus);
+    const ceiling = (config.basePoints * (1 + config.firstInAreaBonus)) / (1 - config.repeatDecay);
     expect(total).toBeCloseTo(ceiling, 6);
   });
 });
@@ -220,19 +217,20 @@ describe('applyGain', () => {
 describe('scoring a day', () => {
   it('diminishes within an area and starts afresh the next day', () => {
     const log = [fact(), fact({ at: T0 + HOUR_MS }), fact({ at: T0 + DAY_MS, dayKey: DAY_2 })];
-    expect(pointsOf(log)).toEqual([20, 5, 20]);
+    expect(pointsOf(log)).toEqual([20, 10, 20]);
   });
 
-  it('pays a smaller bonus for each further area opened', () => {
+  it('pays the same for the first task in each area, however many are opened', () => {
     const log = [
       fact({ areaId: 'work' }),
       fact({ areaId: 'health', at: T0 + HOUR_MS }),
       fact({ areaId: 'home', at: T0 + 2 * HOUR_MS }),
+      fact({ areaId: 'home', at: T0 + 3 * HOUR_MS }),
     ];
-    expect(pointsOf(log)).toEqual([20, 15, 12.5]);
+    expect(pointsOf(log)).toEqual([20, 20, 20, 10]);
   });
 
-  it('does not count unfiled items as an opened area', () => {
+  it('gives unfiled items no bonus, and leaves the areas alone', () => {
     const log = [fact({ areaId: null }), fact({ areaId: 'work', at: T0 + HOUR_MS })];
     expect(pointsOf(log)).toEqual([10, 20]);
   });
@@ -244,7 +242,7 @@ describe('scoring a day', () => {
       fact({ areaId: 'work', friction: 5, at: T0 + 2 * HOUR_MS }),
       fact({ areaId: 'work', at: T0 + 3 * HOUR_MS }),
     ];
-    expect(pointsOf(log)).toEqual([24, 6, 5, 1.25]);
+    expect(pointsOf(log)).toEqual([24, 12, 10, 2.5]);
   });
 });
 
@@ -347,9 +345,9 @@ describe('pricing the next completion', () => {
   it('prices points by where the item falls today, whatever HEAT is', () => {
     const cold: HeatState = { ...empty, heat: 0, areaCounts: { work: 1, health: 1 } };
     const surging: HeatState = { ...cold, heat: 110 };
-    // A repeat in Work is worth half a plain task; Home is the third area, so its bonus is a quarter.
-    expect(pointsNow(cold, plain, config)).toBeCloseTo(5, 10);
-    expect(pointsNow(cold, { ...plain, areaId: 'home' }, config)).toBeCloseTo(12.5, 10);
+    // A repeat in Work is worth half a first task; Home has not been opened, so it starts afresh.
+    expect(pointsNow(cold, plain, config)).toBeCloseTo(10, 10);
+    expect(pointsNow(cold, { ...plain, areaId: 'home' }, config)).toBeCloseTo(20, 10);
     expect(pointsNow(surging, plain, config)).toBe(pointsNow(cold, plain, config));
   });
 
@@ -440,7 +438,7 @@ describe('a config that changes over time', () => {
 
     const cooled = cool(FIRST_TASK, HOUR_MS, config);
     const cooledAgain = cool(cooled, HOUR_MS, later);
-    const points = pointsFor(second, { inArea: 0, areasOpened: 1 }, later);
+    const points = pointsFor(second, { inArea: 0 }, later);
     expect(scored[1]?.heatAfter).toBeCloseTo(applyGain(cooledAgain, points, later), 3);
   });
 

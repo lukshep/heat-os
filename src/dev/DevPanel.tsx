@@ -81,7 +81,6 @@ const CONFIG_FIELDS: ConfigField[] = [
   },
   { key: 'basePoints', label: 'Base points', min: 1, max: 30, step: 1 },
   { key: 'firstInAreaBonus', label: 'First-in-area bonus', min: 0, max: 2, step: 0.05 },
-  { key: 'areaBonusDecay', label: 'Bonus kept per further area', min: 0, max: 1, step: 0.05 },
   { key: 'repeatDecay', label: 'Kept per further task in area', min: 0, max: 0.95, step: 0.05 },
   {
     key: 'frictionStep',

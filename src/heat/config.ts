@@ -11,15 +11,16 @@ export interface HeatConfig {
   gainScale: number;
   /** Points for a plain task before any multiplier. */
   basePoints: number;
-  /** Extra share of a plain task earned by the first completion in an area each day. */
+  /**
+   * Extra share of a plain task earned by the first completion in an area each day. Every area
+   * starts with it, however many have been opened, and repeats step down from it.
+   */
   firstInAreaBonus: number;
-  /** Share of that bonus kept by each further area opened the same day. */
-  areaBonusDecay: number;
   /** Each further completion in the same area that day is worth this share of the one before. */
   repeatDecay: number;
   /**
    * Extra share of an item's own reward for each star of Friction: how hard it is to start,
-   * not necessarily to do. 0.1 means 10% more a star, so five stars add 50%.
+   * not necessarily to do. 0.2 means 20% more a star, so five stars double it.
    */
   frictionStep: number;
   /** Added to an item's multiplier for a routine at full warmth. */
@@ -38,12 +39,11 @@ export interface HeatConfig {
 export const DEFAULT_CONFIG: HeatConfig = {
   dailyRetention: 0.8,
   surgeRetention: 0.85,
-  gainScale: 215,
+  gainScale: 275,
   basePoints: 10,
   firstInAreaBonus: 0.5,
-  areaBonusDecay: 0.7,
   repeatDecay: 0.8,
-  frictionStep: 0.1,
+  frictionStep: 0.2,
   warmthBonus: 1,
   warmthStep: 0.25,
   missStep: 0.2,

@@ -261,7 +261,7 @@ export const SCENARIOS: readonly [Scenario, ...Scenario[]] = [
   },
   {
     name: 'Five stars everywhere',
-    note: 'The balanced day with five stars of Friction on every task. Friction is a share of the reward, so this stays short of Surge.',
+    note: 'The balanced day with five stars of Friction on every task. It reaches Surge for part of each day, and no further.',
     ...EVERY_DAY_ON, areas: 4, tasks: 8, starred: 8, stars: 5, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {

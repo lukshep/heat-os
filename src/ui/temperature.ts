@@ -52,21 +52,22 @@ export function heatColor(temperature: number): string {
   return 'oklch(0.975 0.07 102)';
 }
 
-/** The most any item can earn: a fully warm routine with every star of Friction, the first thing done in a day. */
+/** The most any item can earn: a fully warm routine with every star of Friction, the first thing done in its area. */
 const HOTTEST_ITEM: Scorable = { areaId: 'hottest', friction: FRICTION_STARS, warmth: 1 };
-const START_OF_DAY: DayPosition = { inArea: 0, areasOpened: 0 };
+const START_OF_DAY: DayPosition = { inArea: 0 };
 
-/** Below 1 this lifts small rewards, so everyday items do not all crowd the cold end. */
-const CURVE = 0.6;
+/** Below 1 this lifts small rewards, so everyday items sit in the warm middle, not the cold end. */
+const CURVE = 0.45;
 
 /**
- * Turns the points an item would earn right now into a temperature from 0 to 1, where 1 is the
- * most any item can earn. HEAT plays no part, so a ring shows what the item is worth at any level
- * of the gauge, and a tag or a routine's warmth always shows. The scale is anchored to the engine,
- * so retuning the numbers does not shift every colour. Items never go past 1: the pale end of the
- * gradient belongs to Surge alone.
+ * Turns the points an item would earn right now into a temperature from 0 to SURGE_PEAK, where
+ * the peak is the most any item can earn. HEAT plays no part, so a ring shows what the item is
+ * worth at any level of the gauge, and Friction or a routine's warmth always shows. The scale is
+ * anchored to the engine, so retuning the numbers does not shift every colour. Rings use the
+ * whole gradient: only the hottest items reach its pale end, which the edge line also shows in
+ * Surge.
  */
 export function temperatureOf(points: number, config: HeatConfig): number {
   const hottest = pointsFor(HOTTEST_ITEM, START_OF_DAY, config);
-  return hottest > 0 ? Math.pow(clamp(points / hottest, FULL), CURVE) : 0;
+  return hottest > 0 ? SURGE_PEAK * Math.pow(clamp(points / hottest, FULL), CURVE) : 0;
 }

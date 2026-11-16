@@ -24,8 +24,6 @@ export interface CompletionFact extends Scorable {
 export interface DayPosition {
   /** Completions already logged in the item's area today. */
   inArea: number;
-  /** Areas that already have a completion today. */
-  areasOpened: number;
 }
 
 export interface HeatState {
@@ -124,14 +122,14 @@ export function cool(heat: number, elapsedMs: number, config: HeatConfig): numbe
 }
 
 /**
- * Multiplier from position within the day. Each further completion in an area is worth a
- * share of the one before. The first completion in an area also earns a bonus, and that
- * bonus shrinks with every area already opened today. Items with no area earn no bonus.
+ * Multiplier from position within the day. The first completion in an area earns a bonus, the
+ * same in every area however many have been opened, and each further one in that area is worth
+ * a share of the one before: 1.5, 1.2, 0.96 with the defaults. Items with no area earn no bonus
+ * and step down the same way from 1.
  */
 export function areaFactor(areaId: string | null, position: DayPosition, config: HeatConfig): number {
-  const repeat = Math.pow(config.repeatDecay, position.inArea);
-  if (areaId === null || position.inArea > 0) return repeat;
-  return repeat + config.firstInAreaBonus * Math.pow(config.areaBonusDecay, position.areasOpened);
+  const first = areaId === null ? 1 : 1 + config.firstInAreaBonus;
+  return first * Math.pow(config.repeatDecay, position.inArea);
 }
 
 /** Multiplier from a routine's warmth: 1 for a task or a cold routine, more as it warms. */
@@ -164,11 +162,7 @@ export function applyGain(heat: number, points: number, config: HeatConfig): num
 
 /** Where `item` would fall in a day that already holds these completions. */
 function positionOf(areaCounts: Readonly<Record<string, number>>, item: Scorable): DayPosition {
-  let areasOpened = 0;
-  for (const bucket of Object.keys(areaCounts)) {
-    if (bucket !== UNASSIGNED) areasOpened += 1;
-  }
-  return { inArea: areaCounts[areaBucket(item.areaId)] ?? 0, areasOpened };
+  return { inArea: areaCounts[areaBucket(item.areaId)] ?? 0 };
 }
 
 /**

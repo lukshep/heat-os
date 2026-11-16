@@ -2,22 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { STANDARD_TUNING, tuned } from '../heat/config';
 import { pointsFor, type DayPosition, type Scorable } from '../heat/engine';
 import { TEST_CONFIG as config } from '../heat/testConfig';
-import { temperatureOf } from './temperature';
+import { SURGE_PEAK, temperatureOf } from './temperature';
 
 const plain: Scorable = { areaId: 'work', friction: 0, warmth: 0 };
-const fresh: DayPosition = { inArea: 0, areasOpened: 0 };
-const deep: DayPosition = { inArea: 3, areasOpened: 2 };
+const fresh: DayPosition = { inArea: 0 };
+const deep: DayPosition = { inArea: 3 };
 
 function temperature(item: Scorable, position: DayPosition): number {
   return temperatureOf(pointsFor(item, position, config), config);
 }
 
 describe('temperatureOf', () => {
-  it('is 1 for the most any item can earn, and never more', () => {
-    // A fully warm routine with five stars, first in the day: 10 x 2 x 2 x 2.
-    expect(temperatureOf(80, config)).toBeCloseTo(1, 10);
-    expect(temperatureOf(500, config)).toBe(1);
+  it('reaches the Surge peak for the most any item can earn, and never passes it', () => {
+    // A fully warm routine with five stars, first in its area: 10 x 2 x 2 x 2.
+    expect(temperatureOf(80, config)).toBeCloseTo(SURGE_PEAK, 10);
+    expect(temperatureOf(500, config)).toBe(SURGE_PEAK);
     expect(temperatureOf(0, config)).toBe(0);
+  });
+
+  it('puts an everyday task in the warm middle of the gradient, not the cold end', () => {
+    const plainFirst = temperature(plain, fresh);
+    expect(plainFirst).toBeGreaterThan(0.5);
+    expect(plainFirst).toBeLessThan(0.8);
   });
 
   it('shows Friction or warmth by the same step wherever the item falls in its area', () => {

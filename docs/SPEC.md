@@ -153,19 +153,19 @@ What a completion is worth before HEAT resistance:
 ```
 points = base * areaFactor * (1 + warmth) * (1 + friction)    base = 10
 
-areaFactor = 0.8^n                          n = completions already logged in that area today
-           + 0.5 * 0.7^k   when n = 0       k = areas already opened today
+areaFactor = 1.5 * 0.8^n                    n = completions already logged in that area today
+           = 0.8^n          with no area   (the Inbox)
 
-friction = 0.1 per star                     0 to 5 stars, so at most 0.5
+friction = 0.2 per star                     0 to 5 stars, so at most 1
 ```
 
-- **Within an area** each further task is worth 80% of the one before. Plain tasks in the day's first area score 15, 8, 6.4, 5.1, 4.1, so several tasks in an area stay worthwhile.
-- **The first task in an area** earns a bonus of half a plain task. Each further area opened that day earns 70% of the previous area's bonus, so first tasks score 15, 13.5, 12.4, 11.7, 11.2, 10.8. A first task in a new area is always worth more than a repeat.
-- **An area's daily ceiling** is 55 points from plain tasks, however many are completed or however finely they are split.
-- **Friction** adds 10% of the task's own reward for each star, up to 50% for five. Because it scales the reward, it shrinks with it: a first task in a fresh area scores 15 plain and 22.5 with five stars, the fifth in an area 4.1 and 6.1. A first task in a fresh area is always worth more than a five-star repeat.
+- **Every area starts at 15.** The first plain task in an area each day scores 15, half as much again as a plain task, however many areas have been opened already.
+- **Within an area** each further task is worth 80% of the one before, so plain tasks score 15, 12, 9.6, 7.7, 6.1. There is no cliff after the first, so several tasks in an area stay worthwhile. A first task in a fresh area is always worth more than a plain repeat.
+- **An area's daily ceiling** is 75 points from plain tasks, however many are completed or however finely they are split.
+- **Friction** adds 20% of the task's own reward for each star, so five stars double it. Because it scales the reward, it shrinks with it: a first task scores 15 plain and 30 with five stars, the fifth in an area 6.1 and 12.3. A five-star repeat can outweigh a plain first task elsewhere; that is what the stars are for.
 - **Priority** adds nothing. It orders lists and keeps a task with no date on Today.
-- **Warmth** doubles a fully warm routine's reward, and Friction applies on top: a fully warm routine with two stars earns 2 × 1.2 times a plain task's.
-- **Inbox tasks** with no area earn no bonus and do not count as an opened area.
+- **Warmth** doubles a fully warm routine's reward, and Friction applies on top: a fully warm routine with two stars earns 2 × 1.4 times a plain task's.
+- **Inbox tasks** with no area earn no bonus: 10, 8, 6.4, and so on.
 
 The area day starts at 04:00 local. Each completion stores its own `dayKey`, so travel never rescores history.
 
@@ -174,12 +174,12 @@ The area day starts at 04:00 local. Each completion stores its own `dayKey`, so 
 Each point closes a fraction of the remaining gap to the ceiling of 120:
 
 ```
-H <- 120 - (120 - H) * e^(-points / S)      S = 215
+H <- 120 - (120 - H) * e^(-points / S)      S = 275
 ```
 
-HEAT cannot exceed 120. Low HEAT rises faster than high HEAT: a 15-point task adds 8.1 at HEAT 0, 4.7 at 50, 3.4 at 70, 2.4 at 85 and 1.3 at 100.
+HEAT cannot exceed 120. Low HEAT rises faster than high HEAT: a 15-point task adds 6.4 at HEAT 0, 3.7 at 50, 2.7 at 70, 1.9 at 85 and 1.1 at 100.
 
-Aiming the curve at 120 is what makes 100 reachable at all, and the gain scale is what makes it hard: from the low point of a balanced routine (68), filling the gauge takes about 206 points in one day, more than two balanced days of work.
+Aiming the curve at 120 is what makes 100 reachable at all, and the gain scale is what makes it hard: from the low point of a balanced routine (68), filling the gauge takes about 264 points in one day, nearly two and a half balanced days of work.
 
 ### Expected behaviour
 
@@ -187,22 +187,22 @@ The same pattern every day, completed in one sitting. HEAT swings between a dail
 
 | Daily pattern | Points | Daily peak | Daily low | Time in Surge |
 |---|---|---|---|---|
-| One task in each of 5 areas | 64 | 76 | 61 | None |
-| Light day: two tasks in each of 3 areas | 65 | 77 | 61 | None |
-| Balanced day: two tasks in each of 4 areas | 85 | 85 | 68 | None |
-| Balanced day, its first task with five stars of Friction | 92 | 87 | 70 | None |
-| Big day: three tasks in each of 4 areas, the first with five stars | 118 | 94 | 75 | None |
-| Huge day: a big day with its first two tasks at five stars, and three warm routines | 175 | 104 | 85 | 27% |
-| Balanced day with five stars on every task | 127 | 96 | 77 | None |
-| One area, unlimited tasks | at most 55 | 71 | 57 | None |
-| Three warm routines and three tasks, spread through the day | 103 | 87 | 76 | None |
+| One task in each of 5 areas | 75 | 73 | 59 | None |
+| Light day: two tasks in each of 3 areas | 81 | 76 | 61 | None |
+| Balanced day: two tasks in each of 4 areas | 108 | 85 | 68 | None |
+| Balanced day, its first task with five stars of Friction | 123 | 89 | 71 | None |
+| Big day: three tasks in each of 4 areas, the first with five stars | 161 | 96 | 77 | None |
+| Huge day: a big day with its first two tasks at five stars, and three warm routines | 235 | 106 | 87 | 36% |
+| Balanced day with five stars on every task | 216 | 104 | 84 | 22% |
+| One area, unlimited tasks | at most 75 | 73 | 59 | None |
+| Three warm routines and three tasks, spread through the day | 123 | 84 | 75 | None |
 
 - **Where consistency sits.** A balanced day, kept up, moves between 68 and 85. It never fills the gauge, however long it is kept up.
-- **Surge is uncommon.** A full gauge needs about two and a half balanced days of points in one day. A huge day kept up every day spends about a quarter of its time in Surge and is back below 100 before the next day's work. Friction alone cannot get there: a balanced day with five stars on every task peaks at 96.
-- **Friction lifts a little.** Five stars on a balanced day's first task take its peak from 85 to 87.
-- **Balance.** Breadth pays more per task than depth, and one area alone tops out at 71.
+- **Surge is uncommon.** A full gauge needs nearly two and a half balanced days of points in one day. A huge day kept up every day spends about a third of its time in Surge and is back below 100 before the next day's work. Friction alone gets there only at its limit: a balanced day with five stars on every task peaks at 104, while three stars on every task stays short of it.
+- **Friction lifts.** Five stars on a balanced day's first task take its peak from 85 to 89.
+- **Balance.** Breadth pays more per task than depth, and one area alone tops out at 73.
 - **Rest is not punished.** From 85, HEAT is 68 after one day off and 54 after two. After a week away it is back above 70 on the third balanced day.
-- **Recovery.** From zero the first task adds about 8. Balanced days peak at 39, 60, 72, 78 and 81.
+- **Recovery.** From zero the first task adds about 6. Balanced days peak at 39, 60, 71, 78 and 81.
 - **Stored momentum.** From 110, HEAT is still in Surge twelve hours later and at 91 a day later. At the ordinary rate it would be 98 and 88.
 
 ### Effort and Cooling
@@ -218,7 +218,7 @@ A balanced day (two tasks in each of four areas), every day, peaks and lows:
 | Effort | Slower | Standard | Faster |
 |---|---|---|---|
 | Easier | 99 / 84 | 93 / 74 | 88 / 66 |
-| Standard | 92 / 78 | 85 / 68 | 79 / 59 |
+| Standard | 91 / 78 | 85 / 68 | 79 / 59 |
 | Harder | 84 / 72 | 77 / 61 | 70 / 53 |
 
 On every combination a balanced day stays out of Surge, and a huge day kept up every day drops back below 100 before the next day's work.
@@ -241,7 +241,7 @@ Warmth is a hidden value from 0 to 1 per routine. The area part of a fully warm 
 
 ### Colour
 
-An item's colour maps the points it would earn if completed now onto a continuous temperature gradient. HEAT itself plays no part: a ring shows what the item is worth, and the edge shows how warm the person is. The scale is fixed, with the hottest colour at the most any item can earn, a fully warm routine with five stars done first in the day. Everyday items sit in the middle of the gradient, and the hot end is kept for warm routines and items with Friction. Priority does not change a ring; a bold title shows it.
+An item's colour maps the points it would earn if completed now onto a continuous temperature gradient. HEAT itself plays no part: a ring shows what the item is worth, and the edge shows how warm the person is. The scale is fixed, and rings use the whole gradient: the most any item can earn, a fully warm routine with five stars done first in its area, is the pale yellow of the Surge peak. The mapping is curved (points to the power 0.45), so everyday items sit in the warm middle: a plain first task is red, a second in its area a little cooler, and only Friction and warmth reach orange, yellow and beyond. Priority does not change a ring; a bold title shows it.
 
 Colour is recomputed whenever the day's completions change, so every open task and routine always shows what it is currently worth:
 
@@ -249,7 +249,7 @@ Colour is recomputed whenever the day's completions change, so every open task a
 - Friction or a routine's warmth always shows: the item is a step warmer than the plain ones beside it, by the same step wherever it falls in its area
 - the hottest ring is still the item that would add the most HEAT, since at any one moment HEAT scales every item's gain by the same factor
 
-The edge line uses the same gradient for HEAT itself and carries on past it in Surge, from yellow at 100 to a bright pale yellow at 120. Rows never reach that pale end.
+The edge line uses the same gradient for HEAT itself, reaching yellow at 100 and the bright pale yellow at 120 in Surge. Only the hottest rings share that pale end. A ring's glow stops growing at the yellow of a full gauge, so the hottest rings look paler, not bigger.
 
 ### Surge on screen
 
@@ -261,12 +261,13 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 
 | Risk | What happens | Default response |
 |---|---|---|
-| Friction inflation | Five stars on all eight tasks of a balanced day scores 127 points and peaks at 96, short of Surge | Small, since Friction is a share of the reward. The stars still only mean something if used honestly |
-| Trivial-task breadth farming | With no task size, one trivial task in each of five areas settles at 76, inside the band meant for balanced activity | Accepted now that there is no line to pass. Fallback: an optional effort size |
+| Friction inflation | Five stars on all eight tasks of a balanced day scores 216 points and peaks at 104, in Surge for about a fifth of the day. Three stars on everything stays short of it | Accepted: the stars only mean something if used honestly, and Surge from them still fades within the day |
+| Trivial-task breadth farming | With no task size, one trivial task in each of five areas settles at 73, inside the band meant for balanced activity | Accepted now that there is no line to pass. Fallback: an optional effort size |
 | The typical day is a guess | Everything is calibrated to two tasks in each of four areas being a balanced day | The gain scale is the one dial: lower it and the same day sits higher. Retune after real use |
-| Area proliferation | Every extra area still adds a first task worth more than a repeat | Keep areas few (about 4–6); the bonus shrinks with each one |
-| Task splitting | Twenty small tasks instead of one | Bounded at about 3.6 times one task, per area per day |
+| Area proliferation | Every extra area starts afresh at 15, with its own ladder of repeats | Keep areas few (about 4–6). The gain scale is tuned for four |
+| Task splitting | Twenty small tasks instead of one | Bounded at about 4.9 times one task, per area per day, and at 75 points however finely the work is cut |
 | Warm rows in Surge | Rings do not cool as HEAT climbs, so in Surge they look as inviting as ever and give no sign that it is fine to stop | The edge line carries that sign: in Surge it thickens, pales and a band travels round it. Rings stay true to what each item is worth |
+| Rings in Surge's colour | The hottest rings are the pale yellow the edge line shows in Surge | Accepted (M20). Only a warm routine with several stars gets there, and the line is the only thing that thickens and shimmers |
 | Surge as a target | A thicker, brighter line could become the new thing to chase every day | It takes a huge day and fades within about a day. No record is kept and it is never named in the app |
 | No landmark on the edge | Without a mark, 70 and 85 are a short distance apart on a featureless line | Colour carries the level. Watch whether position still reads |
 | Warm routines carry a lot | Three warm routines and three tasks settle at 87, above a balanced day of eight tasks | Intended reward for consistency; the full-warmth bonus is the lever |

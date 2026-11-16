@@ -11,7 +11,7 @@ import { describeSchedule, monthDayName, weekdayName, weekdayOrder } from './wee
 
 interface Props {
   item: ListItem;
-  /** 0 (cold) to 1 (hottest): how many points completing it would earn right now, whatever HEAT is. */
+  /** 0 (cold) to SURGE_PEAK (hottest): how many points completing it would earn right now, whatever HEAT is. */
   temperature: number;
   /** Every area and project, for choosing where the item lives. */
   places: readonly Place[];
@@ -80,7 +80,9 @@ export function ItemRow(props: Props) {
   ]
     .filter(Boolean)
     .join(' ');
-  const style = { '--temp': heatColor(temperature), '--glow': temperature.toFixed(3) } as CSSProperties;
+  // The glow stops growing at a full gauge's temperature, so the hottest rings are paler, not bigger.
+  const glow = Math.min(1, temperature);
+  const style = { '--temp': heatColor(temperature), '--glow': glow.toFixed(3) } as CSSProperties;
 
   return (
     <li className={className} style={style}>

@@ -124,32 +124,39 @@ describe('design invariants', () => {
     expect(Math.max(...thirdDayBack.map((sample) => sample.heat))).toBeGreaterThan(70);
   });
 
-  it('adds 10% for each star of Friction, up to 50% for five, wherever the task falls', () => {
+  it('adds 20% for each star of Friction, doubling a task at five, wherever the task falls', () => {
     const shareAt = (friction: number, inArea: number) => {
-      const position = { inArea, areasOpened: 1 };
+      const position = { inArea };
       return pointsFor({ ...plain, friction }, position, config) / pointsFor(plain, position, config) - 1;
     };
     for (const inArea of [0, 3, 6]) {
-      for (const stars of [1, 2, 3, 4, 5]) expect(shareAt(stars, inArea)).toBeCloseTo(stars / 10, 10);
+      for (const stars of [1, 2, 3, 4, 5]) expect(shareAt(stars, inArea)).toBeCloseTo(stars / 5, 10);
     }
   });
 
-  it('keeps a first task in a fresh area worth more than a repeat with five stars', () => {
-    const hardRepeat = pointsFor({ ...plain, friction: 5 }, { inArea: 1, areasOpened: 1 }, config);
-    const freshArea = pointsFor(plain, { inArea: 0, areasOpened: 1 }, config);
-    expect(freshArea).toBeGreaterThan(hardRepeat);
+  it('rates a first task in a fresh area above a plain repeat, and lets five stars outweigh it', () => {
+    const freshArea = pointsFor(plain, { inArea: 0 }, config);
+    expect(freshArea).toBeGreaterThan(pointsFor(plain, { inArea: 1 }, config));
+    expect(pointsFor({ ...plain, friction: 5 }, { inArea: 1 }, config)).toBeGreaterThan(freshArea);
   });
 
   it('lifts a balanced day when its first task has five stars', () => {
     expect(settled(BALANCED_HARD).settledPeak).toBeGreaterThan(settled(BALANCED).settledPeak + 2);
   });
 
-  it('keeps Surge out of reach of Friction alone: every task of a balanced day with five stars', () => {
-    expect(settled(daily({ areas: 4, tasks: 8, starred: 8, stars: 5 })).surgeShare).toBe(0);
+  it('keeps a balanced day out of Surge with three stars on every task', () => {
+    expect(settled(daily({ areas: 4, tasks: 8, starred: 8, stars: 3 })).surgeShare).toBe(0);
   });
 
-  it('pays less than four times as much for one task split into twenty', () => {
-    expect(pointsADay(daily({ tasks: 20 }))).toBeLessThan(4 * pointsADay(daily({ tasks: 1 })));
+  it('lets five stars on every task of a balanced day reach Surge, but not hold it', () => {
+    const { surgeShare, settledLow } = settled(daily({ areas: 4, tasks: 8, starred: 8, stars: 5 }));
+    expect(surgeShare).toBeGreaterThan(0);
+    expect(surgeShare).toBeLessThan(0.5);
+    expect(settledLow).toBeLessThan(FULL_HEAT);
+  });
+
+  it('pays less than five times as much for one task split into twenty', () => {
+    expect(pointsADay(daily({ tasks: 20 }))).toBeLessThan(5 * pointsADay(daily({ tasks: 1 })));
   });
 
   it('rewards breadth over depth', () => {
@@ -159,8 +166,8 @@ describe('design invariants', () => {
   });
 
   it('keeps returns within an area worthwhile over several tasks', () => {
-    const fourth = pointsFor(plain, { inArea: 3, areasOpened: 1 }, config);
-    const eighth = pointsFor(plain, { inArea: 7, areasOpened: 1 }, config);
+    const fourth = pointsFor(plain, { inArea: 3 }, config);
+    const eighth = pointsFor(plain, { inArea: 7 }, config);
     expect(fourth).toBeGreaterThan(config.basePoints / 3);
     expect(eighth).toBeLessThan(config.basePoints / 3);
   });
@@ -180,7 +187,7 @@ describe('design invariants', () => {
     const { scored, stats } = simulate(kept, config, 21);
     const first = scored[0]?.points ?? 0;
     const last = scored[scored.length - 1]?.points ?? 0;
-    expect(first).toBeCloseTo(pointsFor(plain, { inArea: 0, areasOpened: 0 }, config), 6);
+    expect(first).toBeCloseTo(pointsFor(plain, { inArea: 0 }, config), 6);
     expect(last).toBeGreaterThan(1.9 * first);
     expect(stats.routineWarmth ?? 0).toBeGreaterThan(0.95);
   });
@@ -203,13 +210,13 @@ describe('design invariants', () => {
  */
 describe('calibration snapshot', () => {
   const table: [string, Scenario, number, number][] = [
-    ['one task in each of 5 areas', ONE_PER_AREA, 76, 61],
-    ['light day', LIGHT, 77, 61],
+    ['one task in each of 5 areas', ONE_PER_AREA, 73, 59],
+    ['light day', LIGHT, 76, 61],
     ['balanced day', BALANCED, 85, 68],
-    ['balanced day, first task with five stars', BALANCED_HARD, 87, 70],
-    ['big day', BIG, 94, 75],
-    ['huge day', HUGE, 104, 85],
-    ['one area, unlimited tasks', ONE_AREA_UNLIMITED, 71, 57],
+    ['balanced day, first task with five stars', BALANCED_HARD, 89, 71],
+    ['big day', BIG, 96, 77],
+    ['huge day', HUGE, 106, 87],
+    ['one area, unlimited tasks', ONE_AREA_UNLIMITED, 73, 59],
   ];
 
   it.each(table)('%s settles where the spec says', (_name, scenario, peak, low) => {
@@ -219,15 +226,15 @@ describe('calibration snapshot', () => {
   });
 
   it('scores the reference days as the spec says', () => {
-    expect(pointsADay(BALANCED)).toBeCloseTo(84.67, 2);
-    expect(pointsADay(BALANCED_HARD)).toBeCloseTo(92.17, 2);
-    expect(pointsADay(LIGHT)).toBeCloseTo(64.95, 2);
+    expect(pointsADay(BALANCED)).toBeCloseTo(108, 2);
+    expect(pointsADay(BALANCED_HARD)).toBeCloseTo(123, 2);
+    expect(pointsADay(LIGHT)).toBeCloseTo(81, 2);
   });
 
-  it('needs about 206 points in a day to fill the gauge from a balanced routine', () => {
+  it('needs about 264 points in a day to fill the gauge from a balanced routine', () => {
     const low = settled(BALANCED).settledLow;
     const needed = -config.gainScale * Math.log((MAX_HEAT - FULL_HEAT) / (MAX_HEAT - low));
-    expect(Math.round(needed)).toBe(206);
+    expect(Math.round(needed)).toBe(264);
   });
 });
 
