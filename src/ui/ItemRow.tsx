@@ -22,6 +22,8 @@ interface Props {
   stays: boolean;
   /** The row joined a list that was already on screen, so it should ease in. Read once, when it appears. */
   arrives: boolean;
+  /** A routine shown on a later day whose date has not opened: it can be opened and edited, not done. */
+  waiting?: boolean;
   onToggle: () => void;
   onComplete: () => void;
   /** Takes back today's completion of a routine that is shown as done. */
@@ -66,7 +68,14 @@ export function ItemRow(props: Props) {
     item.friction && 'Friction',
   ].filter(Boolean);
 
-  const className = ['row', arrived && 'is-entering', leaving && 'is-leaving', done && 'is-done']
+  const waiting = !done && props.waiting === true;
+  const className = [
+    'row',
+    arrived && 'is-entering',
+    leaving && 'is-leaving',
+    done && 'is-done',
+    waiting && 'is-waiting',
+  ]
     .filter(Boolean)
     .join(' ');
   const style = { '--temp': heatColor(temperature), '--glow': temperature.toFixed(3) } as CSSProperties;
@@ -78,8 +87,8 @@ export function ItemRow(props: Props) {
           <button
             className="row-check"
             type="button"
-            aria-label={done ? (undoable ? `Undo: ${item.title}` : `Done: ${item.title}`) : `Complete: ${item.title}`}
-            disabled={done && !undoable}
+            aria-label={checkLabel(item.title, done, undoable, waiting)}
+            disabled={(done && !undoable) || waiting}
             onClick={done ? props.onUndo : complete}
           >
             <span className="row-check-ring">{done && <CheckIcon />}</span>
@@ -94,6 +103,12 @@ export function ItemRow(props: Props) {
       </div>
     </li>
   );
+}
+
+/** What the ring does, said for a screen reader. */
+function checkLabel(title: string, done: boolean, undoable: boolean, waiting: boolean): string {
+  if (done) return undoable ? `Undo: ${title}` : `Done: ${title}`;
+  return waiting ? `Not open yet: ${title}` : `Complete: ${title}`;
 }
 
 const INBOX = 'inbox';

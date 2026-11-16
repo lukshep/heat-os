@@ -18,12 +18,14 @@ interface Props {
   routinesStay?: boolean;
   /** The day this list is for. Rows planned for it show only their time. */
   listDay?: DayKey;
+  /** Whether a row can be done now. Rows that cannot are shown waiting. Every row can by default. */
+  canComplete?: (item: ListItem) => boolean;
   trailing?: ((item: ListItem) => ReactNode) | undefined;
 }
 
 /** A list of rows, each coloured by the points it would earn right now. One row opens at a time. */
 export function ItemList(props: Props) {
-  const { items, view, onComplete, showPlace = false, routinesStay = false, listDay, trailing } = props;
+  const { items, view, onComplete, showPlace = false, routinesStay = false, listDay, canComplete, trailing } = props;
   const actions = useActions();
   const [openId, setOpenId] = useState<ID | null>(null);
 
@@ -32,9 +34,11 @@ export function ItemList(props: Props) {
   const [onScreen, setOnScreen] = useState(false);
   useEffect(() => setOnScreen(true), []);
 
-  /** A routine already done is worth nothing more until it is open again. */
+  const waiting = (item: ListItem) => canComplete !== undefined && !canComplete(item);
+
+  /** A routine already done, or not open yet, is worth nothing until it is open. */
   function temperature(item: ListItem): number {
-    if (item.done) return 0;
+    if (item.done || waiting(item)) return 0;
     return temperatureOf(pointsNow(view.heat, scorable(item), view.config), view.config);
   }
 
@@ -51,6 +55,7 @@ export function ItemList(props: Props) {
           open={openId === item.id}
           stays={routinesStay && item.kind === 'routine'}
           arrives={onScreen}
+          waiting={waiting(item)}
           onToggle={() => setOpenId(openId === item.id ? null : item.id)}
           onComplete={() => onComplete(item)}
           onUndo={() => item.undoId !== null && actions.undoCompletion(item.undoId)}

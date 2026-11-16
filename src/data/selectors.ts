@@ -1,7 +1,7 @@
 import { DEFAULT_CONFIG, STANDARD_TUNING, tuned, type HeatConfig } from '../heat/config';
 import type { DayKey } from '../heat/day';
 import type { ConfigTimeline, Scorable } from '../heat/engine';
-import { occurrenceNow, type Schedule } from '../heat/schedule';
+import { occurrenceNow, occursOn, type Schedule } from '../heat/schedule';
 import type { Candidate } from '../heat/suggest';
 import { warmthAt, type WarmthState } from '../heat/warmth';
 import {
@@ -361,14 +361,50 @@ export function planToday(items: readonly ListItem[], today: DayKey, dayStartHou
     .filter((item) => item.kind === 'task' && item.date !== null && item.date <= today)
     // Stable, so tasks planned for the same day keep their oldest-first order.
     .sort((a, b) => ((a.date ?? '') < (b.date ?? '') ? -1 : (a.date ?? '') > (b.date ?? '') ? 1 : 0));
-  const settled = [...routines, ...planned];
-  const timed = settled
-    .filter((item) => item.time !== null)
-    .sort((a, b) => minutesIntoDay(a.time ?? '', dayStartHour) - minutesIntoDay(b.time ?? '', dayStartHour));
-
   return {
-    settled: [...timed, ...settled.filter((item) => item.time === null)],
+    settled: timedFirst([...routines, ...planned], dayStartHour),
     plannedTasks: planned.length,
     undated: items.filter((item) => item.kind === 'task' && item.date === null),
   };
+}
+
+/** Everything with a time, in time order, then the rest in the order given. */
+function timedFirst(items: readonly ListItem[], dayStartHour: number): ListItem[] {
+  const timed = items
+    .filter((item) => item.time !== null)
+    .sort((a, b) => minutesIntoDay(a.time ?? '', dayStartHour) - minutesIntoDay(b.time ?? '', dayStartHour));
+  return [...timed, ...items.filter((item) => item.time === null)];
+}
+
+/**
+ * What a later day holds: the tasks planned for it and the routines due on it, timed ones
+ * first, then routines, then tasks. A routine's row speaks for that day's date: done if it was
+ * done early, open if it has opened early, and otherwise not open yet (`occurrence` null).
+ */
+export function dayList(state: AppState, items: readonly ListItem[], day: DayKey, dayStartHour: number): ListItem[] {
+  const logs = routineLogs(state);
+  const rows: ListItem[] = [];
+  for (const item of items) {
+    if (item.kind === 'task') {
+      if (item.date === day) rows.push(item);
+      continue;
+    }
+    if (item.repeat === null || !occursOn(item.repeat, day)) continue;
+    const done = logs.get(item.id)?.kept.has(day) ?? false;
+    // Today's completion can be taken back here only if it was for this day.
+    const undoId = item.undoId !== null && state.completions[item.undoId]?.occurrence === day ? item.undoId : null;
+    const occurrence = !done && item.occurrence === day ? day : null;
+    rows.push({ ...item, due: false, done, undoId, occurrence });
+  }
+  return timedFirst(rows, dayStartHour);
+}
+
+/**
+ * True when something is planned on a day: a task, or a monthly routine. Weekly routines are a
+ * rhythm rather than a plan, so they leave no mark, or nearly every day would have one.
+ */
+export function hasPlans(items: readonly ListItem[], day: DayKey): boolean {
+  return items.some((item) =>
+    item.kind === 'task' ? item.date === day : item.repeat?.every === 'month' && occursOn(item.repeat, day),
+  );
 }

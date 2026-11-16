@@ -522,6 +522,138 @@ button {
   color: var(--danger);
 }
 
+/*
+ * The calendar at the top of Today. Everything in it is grey: a picked day is a light fill,
+ * today's date is bold, and a day with something planned has a small dot, never a count.
+ */
+
+.calendar {
+  margin-bottom: 8px;
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.calendar-month {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.calendar-month svg {
+  transform: rotate(90deg);
+  transition: transform 150ms ease;
+}
+
+.calendar-month[aria-expanded='true'] svg {
+  transform: rotate(-90deg);
+}
+
+.calendar-head .text-button,
+.calendar-step.is-back {
+  margin-left: auto;
+}
+
+.calendar-step {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.calendar-step.is-back svg {
+  transform: rotate(180deg);
+}
+
+.calendar-step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.calendar-strip,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendar-grid {
+  animation: drop-in 180ms ease-out;
+}
+
+.calendar-grid > .calendar-weekday {
+  padding: 4px 0;
+  color: var(--faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+.calendar-day {
+  position: relative;
+  min-height: 44px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  padding-bottom: 6px;
+  border-radius: 12px;
+}
+
+.calendar-strip .calendar-day {
+  min-height: 60px;
+}
+
+.calendar-day .calendar-weekday {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.calendar-date {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-day.is-today .calendar-date {
+  font-weight: 700;
+}
+
+.calendar-day[aria-pressed='true'] {
+  background: color-mix(in oklch, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.calendar-day:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.calendar-day.has-plans::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+/* A routine on a later day whose date has not opened yet: there, but not to be done. */
+.row.is-waiting .row-check-ring {
+  border: 2px dashed var(--faint);
+  box-shadow: none;
+}
+
 /* Adding things. */
 
 .add {

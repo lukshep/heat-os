@@ -24,7 +24,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M13 | Due dates and saved format version 6 | Built 2026-11-15; not yet deployed |
 | M14 | Monthly routines | Built 2026-11-15; not yet deployed |
 | M15 | Dates and times on tasks | Built 2026-11-15; not yet deployed |
-| M16 | Calendar in Today | Planned |
+| M16 | Calendar in Today | Built 2026-11-15; not yet deployed |
 | M17 | Areas | Planned |
 
 The first prototype is M1–M3.
@@ -397,6 +397,20 @@ Verified: unit tests for the day and time labels in two locales and for Today's 
 Open after this pass:
 
 1. **A weekly routine on one day reads like a planned task.** "Read · Wed" is a routine due every Wednesday; "Dentist · Wed" is a task planned for this Wednesday. If that confuses, weekly labels could say "Every Wed".
+
+### M16 — Calendar in Today
+
+Today gains a calendar, and can show a later day.
+
+- **The strip** (`src/ui/Calendar.tsx`) shows today and the next six days, each with its weekday and date. Picking a day further on moves it forward in whole weeks so it holds that day (`stripDays`). A "Back to today" button shows while a later day is picked.
+- **The month grid** opens from the month's name above the strip: rows from the locale's first weekday, ‹ › to step months, never back past this one. Past days are dimmed and disabled. Picking a day closes it.
+- **Marks** are a 4-point grey dot under a day with a task planned on it or a monthly routine due (`hasPlans`). Weekly routines leave none. A day's spoken name says "something planned"; there is never a count.
+- **A later day** (`dayList`) lists the tasks planned for it and the routines due on it, timed ones first, then routines, then tasks. A routine there speaks for that day's date: a dashed grey ring when it has not opened, which cannot be pressed ("Not open yet"), a live ring for a monthly one open early, and a check for a date done early, which can be taken back only on the day it was done. Tasks can be done early. A "Plan for Fri, Nov 20" field adds a task planned for that day to the Inbox. The heading becomes the day's full date.
+- **Where the day lives.** The shell holds the picked day. Leaving Today, or tapping its tab, forgets it, and once the day comes round Today is simply today again.
+
+Saved data: unchanged, still version 6. Dates are added through the existing `task/add`.
+
+Verified: unit tests for the strip's weeks, month stepping across years, month grids in two week starts and a leap February, the longer day and month names, a later day's list (order, what can be done ahead, a date done early and whose completion can be taken back) and the marks. On a production build in a desktop browser at phone size, with made-up data: the strip with dots on the right days and every day at least 46 by 60 points; Monday and Friday picked from the strip, with headings, lists, waiting routines and the "Plan for" field adding a dated Inbox task; the month grid at 46 by 44 points a day, past days disabled, no way back before this month, December reached and a day there picked, moving the strip; and the Today tab returning to today. That check found a bug, now fixed: a later day's field and list shared a key, which left old fields behind on Today. Not verified on an iPhone.
 
 ### Later, not planned in detail
 

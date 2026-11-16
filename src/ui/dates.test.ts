@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayName, describeWhen, timeName } from './dates';
+import { dayName, describeWhen, fullDayName, monthName, shortDayName, timeName } from './dates';
 
 // Sunday 15 November 2026.
 const TODAY = '2026-11-15';
@@ -47,5 +47,18 @@ describe('describeWhen', () => {
 
   it('says nothing for an undated task with no time', () => {
     expect(describeWhen(null, null, TODAY)).toBeNull();
+  });
+});
+
+describe('fullDayName, shortDayName and monthName', () => {
+  it('write a day in full for a heading, and in short with its date', () => {
+    expect(fullDayName('2026-11-20', TODAY, 'en-GB')).toBe('Friday 20 November');
+    expect(shortDayName('2026-11-20', TODAY, 'en-GB')).toBe('Fri 20 Nov');
+  });
+
+  it('add the year only when it is not this one', () => {
+    expect(fullDayName('2027-01-04', TODAY, 'en-GB')).toBe('Monday, 4 January 2027');
+    expect(monthName('2026-11-01', TODAY, 'en-GB')).toBe('November');
+    expect(monthName('2027-01-01', TODAY, 'en-GB')).toBe('January 2027');
   });
 });

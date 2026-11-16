@@ -33,8 +33,28 @@ export function dayName(day: DayKey, today: DayKey, locale?: string): string {
   if (ahead === 1) return 'Tomorrow';
   if (ahead === -1) return 'Yesterday';
   if (ahead > 1 && ahead <= WEEKDAY_SPAN) return weekdayName(weekdayOf(day), locale);
+  return formatDay(day, today, { day: 'numeric', month: 'short' }, locale);
+}
+
+/** A day written with the given parts, adding the year only when it is not this one. */
+function formatDay(day: DayKey, today: DayKey, parts: Intl.DateTimeFormatOptions, locale?: string): string {
   const year = day.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric';
-  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year, timeZone: 'UTC' }).format(utcOf(day));
+  return new Intl.DateTimeFormat(locale, { ...parts, year, timeZone: 'UTC' }).format(utcOf(day));
+}
+
+/** A day in full, for a heading: "Friday 20 November". */
+export function fullDayName(day: DayKey, today: DayKey, locale?: string): string {
+  return formatDay(day, today, { weekday: 'long', day: 'numeric', month: 'long' }, locale);
+}
+
+/** A day in short, with its date: "Fri 20 Nov". */
+export function shortDayName(day: DayKey, today: DayKey, locale?: string): string {
+  return formatDay(day, today, { weekday: 'short', day: 'numeric', month: 'short' }, locale);
+}
+
+/** A month by name, with its year when it is not this one: "November", "January 2027". */
+export function monthName(month: DayKey, today: DayKey, locale?: string): string {
+  return formatDay(month, today, { month: 'long' }, locale);
 }
 
 /**

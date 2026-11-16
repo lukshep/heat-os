@@ -2,10 +2,12 @@ import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type
 import { flushSync } from 'react-dom';
 import type { ID } from '../data/model';
 import { inArea, type ListItem } from '../data/selectors';
+import type { DayKey } from '../heat/day';
 import { Inbox } from '../screens/Inbox';
 import { Projects } from '../screens/Projects';
 import { Settings } from '../screens/Settings';
 import { Today } from '../screens/Today';
+import { fullDayName } from '../ui/dates';
 import { EdgeMeter } from '../ui/EdgeMeter';
 import { InboxIcon, PlusIcon, ProjectsIcon, SettingsIcon, TodayIcon } from '../ui/icons';
 import { useActions } from './store';
@@ -61,6 +63,10 @@ function Shell({ saving }: Props) {
   const view = useView();
   const actions = useActions();
   const [tab, setTab] = useState<Tab>('today');
+  // A later day picked on Today's calendar. Today opens on today, so leaving it forgets the day,
+  // and once the picked day comes round (or passes) Today is simply today again.
+  const [pickedDay, setPickedDay] = useState<DayKey | null>(null);
+  const day = pickedDay !== null && pickedDay > view.today ? pickedDay : view.today;
   const [undo, setUndo] = useState<{ completionId: ID; title: string } | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
   const hasInbox = inArea(view.items, null).length > 0;
@@ -75,9 +81,14 @@ function Shell({ saving }: Props) {
     setUndo({ completionId: actions.complete(item), title: item.title });
   }
 
+  function showTab(id: Tab) {
+    setTab(id);
+    setPickedDay(null);
+  }
+
   function capture() {
     // The field has to exist and take focus inside this tap, or a phone will not raise its keyboard.
-    flushSync(() => setTab('inbox'));
+    flushSync(() => showTab('inbox'));
     captureRef.current?.focus();
   }
 
@@ -90,7 +101,7 @@ function Shell({ saving }: Props) {
         type="button"
         aria-label={waiting ? `${label}, with items waiting` : label}
         aria-current={tab === id ? 'page' : undefined}
-        onClick={() => setTab(id)}
+        onClick={() => showTab(id)}
       >
         <Icon />
         {waiting && <span className="tab-dot" />}
@@ -104,7 +115,11 @@ function Shell({ saving }: Props) {
       <EdgeMeter heat={view.heat.heat} />
 
       <header className="head">
-        <h1 className="head-title">{TABS.find((entry) => entry.id === tab)?.label}</h1>
+        <h1 className="head-title">
+          {tab === 'today' && day !== view.today
+            ? fullDayName(day, view.today)
+            : TABS.find((entry) => entry.id === tab)?.label}
+        </h1>
       </header>
 
       <main className="main" key={tab}>
@@ -113,7 +128,7 @@ function Shell({ saving }: Props) {
             Storage is not available here, so nothing will be kept on this device.
           </p>
         )}
-        {tab === 'today' && <Today view={view} onComplete={complete} />}
+        {tab === 'today' && <Today view={view} onComplete={complete} day={day} onPickDay={setPickedDay} />}
         {tab === 'projects' && <Projects view={view} onComplete={complete} />}
         {tab === 'inbox' && <Inbox view={view} onComplete={complete} captureRef={captureRef} />}
         {tab === 'settings' && <Settings view={view} />}

@@ -4,7 +4,7 @@ import type { Tuning } from '../heat/config';
 import { reduce, type Action, type ItemPatch } from '../data/reducer';
 import { heatConfig, routineLog, routineToday, routineWarmth, type ListItem } from '../data/selectors';
 import type { StorageAdapter } from '../data/storage';
-import { addDays } from '../heat/day';
+import { addDays, type DayKey } from '../heat/day';
 import type { Schedule } from '../heat/schedule';
 import { warmthCarriedOver } from '../heat/warmth';
 import { clock, localDayKey } from './clock';
@@ -40,8 +40,8 @@ export function createStore(initial: AppState): AppStore {
  * that depends on the HEAT config, which keeps the reducer pure.
  */
 export interface Actions {
-  /** Adds a task to the Inbox (no area), the top of an area, or a project. */
-  addTask(title: string, areaId: ID | null, projectId?: ID | null): void;
+  /** Adds a task to the Inbox (no area), the top of an area, or a project, planned for `date` if given. */
+  addTask(title: string, areaId: ID | null, projectId?: ID | null, date?: DayKey | null): void;
   updateItem(item: ListItem, patch: ItemPatch): void;
   deleteItem(item: ListItem): void;
   /** Sets how an item repeats. Any days make it a routine; none make it a one-off task. */
@@ -75,8 +75,8 @@ export function createActions(store: AppStore): Actions {
   const dayOf = (at: number) => localDayKey(at, config().dayStartHour);
 
   return {
-    addTask: (title, areaId, projectId = null) =>
-      store.dispatch({ type: 'task/add', id: newId(), at: clock.touch(), title, areaId, projectId }),
+    addTask: (title, areaId, projectId = null, date = null) =>
+      store.dispatch({ type: 'task/add', id: newId(), at: clock.touch(), title, areaId, projectId, date }),
 
     updateItem(item, patch) {
       const type = item.kind === 'task' ? 'task/update' : 'routine/update';

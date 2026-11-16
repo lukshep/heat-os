@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { minutesIntoDay, planToday, type ListItem } from './selectors';
+import type { Schedule } from '../heat/schedule';
+import { TEST_CONFIG } from '../heat/testConfig';
+import { createInitialState, type AppState } from './model';
+import { reduce, type Action } from './reducer';
+import { dayList, hasPlans, listItems, liveAreas, minutesIntoDay, planToday, type ListItem } from './selectors';
 
 const TODAY = '2026-11-15';
 const DAY_START = 4;
@@ -83,5 +87,86 @@ describe('planToday', () => {
     const plan = planToday(items, TODAY, DAY_START);
     expect(plan.plannedTasks).toBe(2);
     expect(ids(plan.undated)).toEqual(['loose']);
+  });
+});
+
+describe('a later day', () => {
+  const FRIDAY = '2026-11-20';
+  const YESTERDAY = '2026-11-14';
+  let areaIds = 0;
+
+  /**
+   * Home holds two tasks planned for Friday, one with a time, a task for Saturday and one with
+   * no date, plus three routines: rent on the 20th of each month, a daily run, and the bins
+   * every Friday. Each was made yesterday.
+   */
+  function week(): AppState {
+    const start = createInitialState(1000, () => `area-${++areaIds}`);
+    const home = liveAreas(start).find((area) => area.name === 'Home')!.id;
+    let at = 2000;
+    const add = (id: string, date: string | null = null): Action => ({
+      type: 'task/add',
+      id,
+      at: ++at,
+      title: id,
+      areaId: home,
+      date,
+    });
+    const repeat = (id: string, schedule: Schedule): Action[] => [
+      add(id),
+      { type: 'task/makeRoutine', id, at: ++at, schedule, asOf: YESTERDAY },
+    ];
+    const actions: Action[] = [
+      ...repeat('rent', { every: 'month', days: [20] }),
+      ...repeat('run', { every: 'week', days: [0, 1, 2, 3, 4, 5, 6] }),
+      ...repeat('bins', { every: 'week', days: [5] }),
+      add('pay', FRIDAY),
+      add('call', FRIDAY),
+      { type: 'task/update', id: 'call', at: ++at, patch: { time: '09:00' } },
+      add('later', '2026-11-21'),
+      add('loose'),
+    ];
+    return actions.reduce(reduce, start);
+  }
+
+  const items = (state: AppState) => listItems(state, TODAY, TEST_CONFIG);
+  const friday = (state: AppState) => dayList(state, items(state), FRIDAY, DAY_START);
+  const rowOf = (rows: readonly ListItem[], id: string) => rows.find((row) => row.id === id);
+
+  it('holds the tasks planned for it and the routines due on it, timed first', () => {
+    expect(ids(friday(week()))).toEqual(['call', 'rent', 'run', 'bins', 'pay']);
+  });
+
+  it('can be done ahead only where a monthly date has opened early', () => {
+    const rows = friday(week());
+    expect(rowOf(rows, 'rent')).toMatchObject({ occurrence: FRIDAY, done: false, due: false });
+    expect(rowOf(rows, 'run')).toMatchObject({ occurrence: null, done: false });
+    expect(rowOf(rows, 'bins')).toMatchObject({ occurrence: null, done: false });
+  });
+
+  it("shows a date done early as done, and takes back only today's completion for that date", () => {
+    const routine = (id: string, completion: string, occurrence: string): Action => ({
+      type: 'routine/complete',
+      id: completion,
+      at: 9000,
+      dayKey: TODAY,
+      routineId: id,
+      warmth: 0,
+      occurrence,
+    });
+    const completions: Action[] = [routine('rent', 'c1', FRIDAY), routine('run', 'c2', TODAY)];
+    const state = completions.reduce(reduce, week());
+    const rows = friday(state);
+    expect(rowOf(rows, 'rent')).toMatchObject({ done: true, undoId: 'c1', occurrence: null });
+    expect(rowOf(rows, 'run')).toMatchObject({ done: false, undoId: null });
+  });
+
+  it('marks days with a planned task or a monthly routine, and not a weekly rhythm', () => {
+    const all = items(week());
+    expect(hasPlans(all, FRIDAY)).toBe(true);
+    expect(hasPlans(all, '2026-11-21')).toBe(true);
+    expect(hasPlans(all, '2026-11-19')).toBe(false);
+    expect(hasPlans(all, '2026-12-20')).toBe(true);
+    expect(hasPlans(all, '2026-12-18')).toBe(false);
   });
 });
