@@ -26,8 +26,8 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M15 | Dates and times on tasks | Deployed 2026-11-15; not yet tried on an iPhone |
 | M16 | Calendar in Today | Deployed 2026-11-15; not yet tried on an iPhone |
 | M17 | Areas | Deployed 2026-11-15; not yet tried on an iPhone |
-| M18 | Daily, an anticlockwise line and a project icon | Built 2026-11-15; not yet deployed |
-| M19 | Priority first, Friction in stars, saved format version 7 | Built 2026-11-15; not yet deployed |
+| M18 | Daily, an anticlockwise line and a project icon | Deployed 2026-11-15; not yet tried on an iPhone |
+| M19 | Priority first, Friction in stars, saved format version 7 | Deployed 2026-11-15; not yet tried on an iPhone |
 
 The first prototype is M1–M3.
 
