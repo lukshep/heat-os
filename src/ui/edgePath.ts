@@ -1,3 +1,6 @@
+import { FULL_HEAT } from '../heat/config';
+import { heatColor } from './temperature';
+
 /**
  * The path the edge meter runs along: a rounded rectangle just inside the screen, starting
  * at the top centre and going anticlockwise, down the left side first. Halfway round is the
@@ -35,4 +38,28 @@ export function edgePath(shape: EdgeShape): string {
     `A${r},${r} 0 0 0 ${right - r},${top}`,
     `H${centre}`,
   ].join(' ');
+}
+
+/** One stretch of the line's gradient: where it starts and how long it is, in HEAT, and its colour. */
+export interface GradientPiece {
+  start: number;
+  length: number;
+  color: string;
+}
+
+/** How far each piece runs on under the next, in HEAT, so no hairline seam shows between them. */
+const SEAM_OVERLAP = 0.05;
+
+/**
+ * The gradient laid along the line as `count` pieces end to end, from the top centre to a full
+ * gauge. An SVG stroke cannot change colour along a path, so the line is drawn in pieces, each
+ * the colour of the temperature at its middle. The last ends exactly at a full gauge.
+ */
+export function gradientPieces(count: number): GradientPiece[] {
+  const step = FULL_HEAT / count;
+  return Array.from({ length: count }, (_, index) => ({
+    start: index * step,
+    length: index === count - 1 ? step : step + SEAM_OVERLAP,
+    color: heatColor((index + 0.5) / count),
+  }));
 }

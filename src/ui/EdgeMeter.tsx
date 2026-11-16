@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { FULL_HEAT, MAX_HEAT } from '../heat/config';
-import { edgePath, type EdgeShape } from './edgePath';
+import { edgePath, gradientPieces, type EdgeShape } from './edgePath';
 import { heatColor } from './temperature';
 
 interface Props {
@@ -47,6 +47,23 @@ function tipAt(filled: number): CSSProperties {
   return { strokeDasharray: `${TIP_LENGTH} ${FULL_HEAT}`, strokeDashoffset: TIP_LENGTH - filled };
 }
 
+/**
+ * How many pieces the gradient is drawn in. Each is a hundredth of the loop, about 24 points on
+ * an iPhone, where the colour changes too little from one to the next to see a step.
+ */
+const GRADIENT_PIECES = 100;
+
+/**
+ * Whether HEAT has just gone over a full gauge, which plays the Surge sweep. Opening the app
+ * already in Surge shows the closed loop with no sweep, as a flare only follows a gain.
+ */
+interface Sweep {
+  /** Counts each time HEAT goes over a full gauge, so each one plays the sweep afresh. */
+  count: number;
+  /** HEAT was at or below a full gauge when last drawn. */
+  below: boolean;
+}
+
 /** True when installed on a phone, where the app is drawn right to the edges of the glass. */
 function fillsPhoneScreen(): boolean {
   const installed =
@@ -61,9 +78,14 @@ function fillsPhoneScreen(): boolean {
  * closes at a full gauge. Its colour is its temperature, and its leading end is lit bright.
  * There is no mark to reach: the line is a gauge, not a target.
  *
- * Past full is Surge. The loop is closed, so the extra shows as intensity: the line
- * thickens, its glow widens, it pales towards white-hot, and a slow shimmer travels round
- * it. It sits over every screen and takes no touches.
+ * Below full the line carries the whole gradient along its length, cold at the top centre and
+ * warmer the further round it reaches, so its leading end is always the colour of HEAT now.
+ *
+ * Going past full plays the Surge sweep: a loop the colour of HEAT runs round from the top
+ * centre, as wide as the line, with a bright tip that fades as it closes, and then covers the
+ * gradient. In Surge the extra shows as intensity: the loop thickens, its glow widens, it pales
+ * towards white-hot, and a slow shimmer travels round it. The line sits over every screen and
+ * takes no touches.
  */
 export function EdgeMeter({ heat }: Props) {
   const level = Math.max(0, Math.min(MAX_HEAT, heat));
@@ -88,6 +110,13 @@ export function EdgeMeter({ heat }: Props) {
   const previous = useRef(level);
   const [flares, setFlares] = useState(0);
 
+  // Worked out while drawing, not after, so the loop never shows closed for a frame first.
+  const [sweep, setSweep] = useState<Sweep>(() => ({ count: 0, below: level <= FULL_HEAT }));
+  if (sweep.below && level > FULL_HEAT) setSweep({ count: sweep.count + 1, below: false });
+  if (!sweep.below && level <= FULL_HEAT) setSweep({ count: sweep.count, below: true });
+
+  const pieces = useMemo(() => gradientPieces(GRADIENT_PIECES), []);
+
   useEffect(() => {
     if (level - previous.current >= FLARE_STEP) setFlares((count) => count + 1);
     previous.current = level;
@@ -103,7 +132,10 @@ export function EdgeMeter({ heat }: Props) {
     '--edge-color': heatColor(level / FULL_HEAT),
     '--edge-width': `${(LINE_WIDTH + SURGE_WIDTH * surge).toFixed(2)}px`,
     '--edge-surge': surge.toFixed(3),
+    // A length, so the sweep's tip can move smoothly from one offset to another.
+    '--edge-tip': `${TIP_LENGTH}px`,
   } as CSSProperties;
+  const whole = { x: -INSET * 10, y: -INSET * 10, width: size.width + INSET * 20, height: size.height + INSET * 20 };
 
   // The number is deliberately not shown. It is still announced for anyone who cannot see the line.
   return (
@@ -139,22 +171,52 @@ export function EdgeMeter({ heat }: Props) {
             <filter id="edge-shimmer-blur" colorInterpolationFilters="sRGB">
               <feGaussianBlur stdDeviation={SHIMMER_BLUR} />
             </filter>
+            {/* How far round HEAT reaches. It reveals the gradient, and moves as the line grows or cools. */}
+            <mask id="edge-reach" maskUnits="userSpaceOnUse" {...whole}>
+              <path className="edge-reach" d={path} pathLength={FULL_HEAT} style={line} />
+            </mask>
+            {/* The whole gradient, round the full loop. Pieces take their width from where they are used. */}
+            <g id="edge-gradient">
+              {pieces.map((piece) => (
+                <path
+                  key={piece.start}
+                  className="edge-piece"
+                  d={path}
+                  pathLength={FULL_HEAT}
+                  stroke={piece.color}
+                  strokeDasharray={`${piece.length} ${2 * FULL_HEAT}`}
+                  strokeDashoffset={-piece.start}
+                />
+              ))}
+            </g>
           </defs>
           <path className="edge-track" d={path} />
-          {flares > 0 && (
-            <path
-              key={flares}
-              className="edge-flare"
-              d={path}
-              pathLength={FULL_HEAT}
-              style={line}
-              filter="url(#edge-flare-blur)"
-            />
-          )}
-          <path className="edge-line" d={path} pathLength={FULL_HEAT} style={line} filter="url(#edge-glow)" />
+          {flares > 0 &&
+            (surge > 0 ? (
+              <path
+                key={flares}
+                className="edge-flare"
+                d={path}
+                pathLength={FULL_HEAT}
+                style={line}
+                filter="url(#edge-flare-blur)"
+              />
+            ) : (
+              <g key={flares} className="edge-flare" filter="url(#edge-flare-blur)">
+                <use href="#edge-gradient" mask="url(#edge-reach)" />
+              </g>
+            ))}
+          <g className="edge-line" filter="url(#edge-glow)">
+            <use href="#edge-gradient" mask="url(#edge-reach)" />
+          </g>
           <path className="edge-tip" d={path} pathLength={FULL_HEAT} style={tipAt(filled)} filter="url(#edge-glow)" />
           {surge > 0 && (
-            <path className="edge-shimmer" d={path} pathLength={FULL_HEAT} filter="url(#edge-shimmer-blur)" />
+            // Keyed by the sweep, so each time HEAT goes over a full gauge the sweep plays again.
+            <g key={sweep.count} className={sweep.count > 0 ? 'edge-surge is-sweeping' : 'edge-surge'}>
+              <path className="edge-surge-line" d={path} pathLength={FULL_HEAT} filter="url(#edge-glow)" />
+              <path className="edge-sweep-tip" d={path} pathLength={FULL_HEAT} filter="url(#edge-glow)" />
+              <path className="edge-shimmer" d={path} pathLength={FULL_HEAT} filter="url(#edge-shimmer-blur)" />
+            </g>
           )}
         </svg>
       )}

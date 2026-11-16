@@ -15,7 +15,7 @@ These are requirements. Do not add features that break them, even as small helpe
 - Never display streak counts, routine warmth or routine progress. Warmth is felt only through colour.
 - No daily completion state and no daily pass or fail: no "all done", no threshold or goal line, no midnight reset of HEAT. The edge meter is the only signal. HEAT resets only when the person asks, from Settings.
 - Settings that change how HEAT behaves (Effort, Cooling, the reset) ask for confirmation before they act, and their steps have names, never numbers.
-- Surge (HEAT above 100) is shown only by the edge line itself. Do not name it in the product UI, record it, count it or reward it.
+- Surge (HEAT above 100) is shown only by the edge line itself. Do not name it in the product UI, record it, count it or reward it. The sweep round the edge when HEAT goes over 100 is the line itself, chosen on purpose; nothing beyond the line may mark the moment.
 - No "areas touched today" indicator, or anything else that turns the day into a checklist.
 - A task's date is a planned day, never a deadline. Nothing is ever overdue, and a past day shows no record of what was or was not done. A routine date that passes undone counts as a miss silently.
 - Temperature colour is the main feedback. Numbers stay out of the product UI; the dev screen may show them. Dates, times and days of the month are the only numbers on screen, and none of them is about HEAT.

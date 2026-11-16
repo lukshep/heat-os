@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { edgePath } from './edgePath';
+import { FULL_HEAT } from '../heat/config';
+import { edgePath, gradientPieces } from './edgePath';
+import { heatColor } from './temperature';
 
 describe('edgePath', () => {
   it('draws from the top centre, anticlockwise down the left side, back to the top centre', () => {
@@ -18,5 +20,28 @@ describe('edgePath', () => {
     expect(edgePath({ width: 0, height: 0, inset: 4, radius: 50 })).toBe(
       'M0,4 H4 A0,0 0 0 0 4,4 V-4 A0,0 0 0 0 4,-4 H-4 A0,0 0 0 0 -4,-4 V4 A0,0 0 0 0 -4,4 H0',
     );
+  });
+});
+
+describe('gradientPieces', () => {
+  const pieces = gradientPieces(100);
+
+  it('runs the gradient from cold at the top centre to a full gauge', () => {
+    expect(pieces).toHaveLength(100);
+    expect(pieces[0]?.color).toBe(heatColor(0.005));
+    expect(pieces[99]?.color).toBe(heatColor(0.995));
+  });
+
+  it('lays the pieces end to end, each running a little under the next', () => {
+    pieces.forEach((piece, index) => {
+      expect(piece.start).toBeCloseTo(index, 10);
+      const next = pieces[index + 1];
+      if (next) expect(piece.start + piece.length).toBeGreaterThan(next.start);
+    });
+  });
+
+  it('ends exactly at a full gauge', () => {
+    const last = pieces[pieces.length - 1];
+    expect((last?.start ?? 0) + (last?.length ?? 0)).toBeCloseTo(FULL_HEAT, 10);
   });
 });

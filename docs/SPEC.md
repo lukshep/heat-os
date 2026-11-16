@@ -253,7 +253,11 @@ The edge line uses the same gradient for HEAT itself, reaching yellow at 100 and
 
 ### Surge on screen
 
-Below 100 the line grows anticlockwise round the edge, down the left side first, and a full loop is 100. Its leading end is a short stretch lit close to white, as wide as the line and no wider. Above 100 the loop is closed, so Surge shows in the line itself: it thickens from 4 to 9 points, pales, glows wider, and a band of light travels slowly round it. The bright tip is hidden, since the line no longer has an end. With reduced motion the band stays still.
+Below 100 the line grows anticlockwise round the edge, down the left side first, and a full loop is 100. It carries the whole gradient along its length: cold slate at the top centre, warming through violet and red to yellow where the loop closes, so the further round it reaches, the warmer its leading end, which is always the colour of HEAT now. Its leading end is a short stretch lit close to white, as wide as the line and no wider. A gain lights the line for a moment in its own colours.
+
+Going over 100 plays the sweep: a loop the colour of HEAT runs round from the top centre in the same direction, as wide as the line, easing in and out over 1.7 seconds. Its bright tip fades over the last stretch, so the loop closes without a jump, and the gradient beneath it then goes. It plays only at the moment HEAT goes over 100. Opening the app already in Surge shows the closed loop with no sweep, and falling back to 100 or below brings the gradient back, so the next crossing plays it again.
+
+In Surge the loop is closed, so Surge shows in the line itself: it thickens from 4 to 9 points, pales, glows wider, and once the sweep is done a band of light travels slowly round it. The bright tip is hidden, since the line no longer has an end. With reduced motion the sweep appears at once and the band stays still.
 
 Nothing else marks Surge. It is not named in the app, and no record is kept of reaching it.
 
@@ -268,7 +272,7 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 | Task splitting | Twenty small tasks instead of one | Bounded at about 4.9 times one task, per area per day, and at 75 points however finely the work is cut |
 | Warm rows in Surge | Rings do not cool as HEAT climbs, so in Surge they look as inviting as ever and give no sign that it is fine to stop | The edge line carries that sign: in Surge it thickens, pales and a band travels round it. Rings stay true to what each item is worth |
 | Rings in Surge's colour | The hottest rings are the pale yellow the edge line shows in Surge | Accepted (M20). Only a warm routine with several stars gets there, and the line is the only thing that thickens and shimmers |
-| Surge as a target | A thicker, brighter line could become the new thing to chase every day | It takes a huge day and fades within about a day. No record is kept and it is never named in the app |
+| Surge as a target | A thicker, brighter line could become the new thing to chase every day, and the sweep makes reaching it a moment (M21) | Accepted on purpose. It takes a huge day and fades within about a day. The sweep plays once per crossing, nothing is recorded or counted, and it is never named in the app |
 | No landmark on the edge | Without a mark, 70 and 85 are a short distance apart on a featureless line | Colour carries the level. Watch whether position still reads |
 | Warm routines carry a lot | Three warm routines and three tasks settle at 87, above a balanced day of eight tasks | Intended reward for consistency; the full-warmth bonus is the lever |
 | Time off resets routines | Three missed days in a row leave a routine cold | Intended. A routine pause is a later feature |

@@ -29,6 +29,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M18 | Daily, an anticlockwise line and a project icon | Deployed 2026-11-15; not yet tried on an iPhone |
 | M19 | Priority first, Friction in stars, saved format version 7 | Deployed 2026-11-15; not yet tried on an iPhone |
 | M20 | Retune: an even area ladder, stronger stars, rings up to the Surge peak | Deployed 2026-11-15; not yet tried on an iPhone |
+| M21 | The gradient along the edge line, and a Surge sweep | Built 2026-11-15; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -480,6 +481,18 @@ HEAT already earned is rescored under the new rules, as at every retune, so the 
 
 Verified with the simulator (the figures in `docs/SPEC.md`, and every Effort and Cooling step keeping a balanced day out of Surge and a huge day below 100 by morning), and on a production build at phone size with made-up data: each ring's temperature matched its place in the day, a plain first task at 0.64, a second in its area at 0.58, three stars in the Inbox at 0.66, and a cold daily routine with five stars at 0.88, all in red to amber. No console errors. Not tried on an iPhone.
 
+### M21 — The gradient along the edge line, and a Surge sweep
+
+Chosen from mockups of the line. No change to saved data or scoring.
+
+- **The gradient along the line.** An SVG stroke cannot change colour along a path, so the whole loop is drawn as a hundred pieces (`gradientPieces` in `src/ui/edgePath.ts`), each the colour of the temperature at its middle and running a little under the next so no seam shows. A mask the width of the line and more reveals as far round as HEAT reaches, and moves as the line grows or cools, as the line did before. The leading end is the colour of HEAT now, and keeps its bright tip.
+- **The flare on a gain** is a blurred copy of the same gradient, so it lights the line in its own colours. In Surge it is the loop's colour, as before.
+- **The sweep.** When HEAT goes over 100 a loop the colour of HEAT runs round from the top centre, as wide as the line, over 1.7 seconds (`--edge-sweep`), easing in and out. Its bright tip fades from about three quarters of the way round, where the eased sweep is slowing, so the loop closes without a jump. There is no flare at the end. The gradient beneath fades once the loop has closed, and the shimmer starts then. Whether HEAT has just gone over 100 is worked out while drawing, so the closed loop never shows for a frame first.
+- **When it plays.** Only at the moment HEAT goes over 100. Opening the app in Surge shows the closed loop with no sweep; falling back to 100 or below brings the gradient back.
+- **Reduced motion.** The global rule now also zeroes animation and transition delays, so the sweep appears at once and the gradient and shimmer do not wait for it.
+
+Verified on a production build at phone size, with made-up completions that brought HEAT to 98: the gradient along the line, slate at the top centre to yellow near the close; completing a routine took HEAT over 100 and played the sweep, checked frame by frame with the animations held: halfway round at half time, the tip at the loop's leading end, full until about three quarters of the way and gone at the close, the gradient still showing ahead of the loop, then hidden, and the shimmer waiting for the close. Reopening in Surge showed the closed loop with no sweep. No console errors. The browser pane was hidden, so the sweep was never seen running at its own speed, and nothing has been tried on an iPhone, where the cost of a hundred pieces under a glow is the thing to watch.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications, reordering areas.
@@ -541,6 +554,8 @@ Cloud sync, routine pause, notifications, reordering areas.
 | 51 | Friction is 20% a star, so five stars double a task. Stars alone can reach Surge at their limit | Decided 2026-11-15; replaces the 10% of 47 |
 | 52 | Rings use the whole gradient up to the Surge peak, on a gentler curve. The glow stops growing at a full gauge | Decided 2026-11-15; replaces "rows never reach the pale end" |
 | 53 | Splitting a task is bounded at five times one task, not four | Decided 2026-11-15 |
+| 54 | The edge line carries the whole gradient along its length below 100 | Decided 2026-11-15 |
+| 55 | Going over 100 plays a sweep round the edge, once per crossing, never on opening. It is the line itself, so it stays within "Surge is shown only by the edge line" | Decided 2026-11-15 |
 
 ## Tuning log
 

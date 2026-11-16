@@ -175,6 +175,8 @@ button {
  */
 
 .edge {
+  /* How long the Surge sweep takes to run round the loop. */
+  --edge-sweep: 1700ms;
   position: absolute;
   inset: 0;
   z-index: 5;
@@ -198,18 +200,34 @@ button {
 }
 
 /*
- * Width and glow both grow with Surge; below a full gauge --edge-surge is 0 and they rest.
- * The glows and blurs are SVG filters set in EdgeMeter.tsx: Safari ignores a CSS filter on
- * a shape inside an SVG.
+ * The line below a full gauge: the gradient, revealed as far round as HEAT reaches. The pieces
+ * take their width from the line, and butt ends, so they meet without bumps. The glows and
+ * blurs are SVG filters set in EdgeMeter.tsx: Safari ignores a CSS filter on a shape inside an
+ * SVG.
  */
 .edge-line {
-  stroke: var(--edge-color);
   stroke-width: var(--edge-width);
   transition:
-    stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    stroke 700ms ease,
     stroke-width 700ms ease,
     opacity 300ms ease;
+}
+
+.edge .edge-piece {
+  stroke-linecap: butt;
+}
+
+/* The mask's stroke is wider than the line and a flare, so it only ever trims the leading end. */
+.edge .edge-reach {
+  stroke: #fff;
+  stroke-width: 24px;
+  stroke-linecap: butt;
+  transition: stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Once the sweep has closed the loop, the gradient beneath it goes. */
+.edge.is-surging .edge-line {
+  opacity: 0;
+  transition: opacity 300ms ease var(--edge-sweep);
 }
 
 /*
@@ -232,10 +250,10 @@ button {
   opacity: 0;
 }
 
-/* A gain lights the whole line for a moment. */
+/* A gain lights the whole line for a moment, in its own colours. */
 .edge-flare {
   stroke: var(--edge-color);
-  stroke-width: 12;
+  stroke-width: 12px;
   opacity: 0;
   animation: edge-flare 900ms ease-out;
 }
@@ -247,9 +265,70 @@ button {
 }
 
 /*
+ * Surge: the closed loop, the colour of HEAT. It thickens, and its glow widens, the deeper into
+ * Surge HEAT goes.
+ */
+.edge-surge-line {
+  stroke: var(--edge-color);
+  stroke-width: var(--edge-width);
+  transition:
+    stroke 700ms ease,
+    stroke-width 700ms ease;
+}
+
+.edge-sweep-tip {
+  display: none;
+}
+
+/*
+ * The sweep, when HEAT goes over a full gauge: the loop runs round from the top centre, as
+ * wide as the line, easing in and out. Its bright tip fades over the last stretch, where the
+ * sweep slows, so the loop closes without a jump. The reduced-motion rule at the end of this
+ * file makes it appear at once.
+ */
+.edge-surge.is-sweeping .edge-surge-line {
+  stroke-dasharray: 100 100;
+  animation: edge-sweep var(--edge-sweep) cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.edge-surge.is-sweeping .edge-sweep-tip {
+  display: inline;
+  stroke: #fff;
+  stroke-width: var(--edge-width);
+  stroke-dasharray: var(--edge-tip) 200;
+  opacity: 0;
+  animation: edge-sweep-tip var(--edge-sweep) cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+@keyframes edge-sweep {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Its time at 62% is where the eased sweep is 78% of the way round. */
+@keyframes edge-sweep-tip {
+  from {
+    stroke-dashoffset: var(--edge-tip);
+    opacity: 0.85;
+  }
+  62% {
+    opacity: 0.85;
+  }
+  to {
+    stroke-dashoffset: calc(var(--edge-tip) - 100px);
+    opacity: 0;
+  }
+}
+
+/*
  * Surge only: a short stretch of white-hot light that travels slowly round the closed loop.
- * It is brighter the deeper into Surge HEAT is. The reduced-motion rule at the end of this
- * file stops it travelling, leaving a still highlight at the top of the screen.
+ * It is brighter the deeper into Surge HEAT is, and after a sweep it waits for the loop to
+ * close. The reduced-motion rule at the end of this file stops it travelling, leaving a still
+ * highlight at the top of the screen.
  */
 .edge-shimmer {
   stroke: #fff;
@@ -259,9 +338,21 @@ button {
   animation: edge-shimmer 7s linear infinite;
 }
 
+.edge-surge.is-sweeping .edge-shimmer {
+  animation:
+    edge-shimmer 7s linear infinite,
+    edge-appear 400ms ease var(--edge-sweep) backwards;
+}
+
 @keyframes edge-shimmer {
   to {
     stroke-dashoffset: -100;
+  }
+}
+
+@keyframes edge-appear {
+  from {
+    opacity: 0;
   }
 }
 
@@ -1153,7 +1244,9 @@ button {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }
