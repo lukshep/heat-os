@@ -39,10 +39,11 @@ const SHIMMER_BLUR = 1.5;
 /**
  * The bright leading end, as lengths along the line in HEAT. It is the end of the line itself,
  * no wider than it: a longer stretch lightened a little, and a shorter one at its very end
- * lightened most, so the line brightens towards its tip.
+ * lightened most, so the line brightens towards its tip. On an iPhone a unit is about 24
+ * points, so the tip is about 30 points long and its brightest part about 12.
  */
-const TIP_LENGTH = 4;
-const TIP_CORE = 1.5;
+const TIP_LENGTH = 1.25;
+const TIP_CORE = 0.5;
 
 /** A stretch of the line `length` long that ends where the line ends. */
 function stretchTo(filled: number, length: number): CSSProperties {
