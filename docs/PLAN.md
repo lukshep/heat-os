@@ -20,12 +20,12 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M9 | Surge: no line, a gauge to 120 | Deployed 2026-11-12 |
 | M10 | Effort, Cooling and a reset | Deployed 2026-11-12; not yet tried on an iPhone |
 | M11 | Priority and Friction | Deployed 2026-11-12; not yet tried on an iPhone |
-| M12 | Rings show points, not HEAT | Built 2026-11-13; not yet deployed |
-| M13 | Due dates and saved format version 6 | Built 2026-11-15; not yet deployed |
-| M14 | Monthly routines | Built 2026-11-15; not yet deployed |
-| M15 | Dates and times on tasks | Built 2026-11-15; not yet deployed |
-| M16 | Calendar in Today | Built 2026-11-15; not yet deployed |
-| M17 | Areas | Built 2026-11-15; not yet deployed |
+| M12 | Rings show points, not HEAT | Deployed 2026-11-13; not yet tried on an iPhone |
+| M13 | Due dates and saved format version 6 | Deployed 2026-11-15; not yet tried on an iPhone |
+| M14 | Monthly routines | Deployed 2026-11-15; not yet tried on an iPhone |
+| M15 | Dates and times on tasks | Deployed 2026-11-15; not yet tried on an iPhone |
+| M16 | Calendar in Today | Deployed 2026-11-15; not yet tried on an iPhone |
+| M17 | Areas | Deployed 2026-11-15; not yet tried on an iPhone |
 
 The first prototype is M1–M3.
 
