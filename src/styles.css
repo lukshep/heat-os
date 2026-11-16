@@ -213,26 +213,16 @@ button {
 }
 
 /*
- * The bright leading end: the last stretch of the line, the same width, lightened towards
- * white in two steps. It is what the eye follows when the line grows or cools, and it moves
- * with the line.
+ * The bright leading end: a short last stretch of the line, the same width, lit close to
+ * white. It is what the eye follows when the line grows or cools, and it moves with the line.
  */
 .edge-tip {
-  transition: opacity 300ms ease;
-}
-
-.edge-tip path {
   stroke: #fff;
   stroke-width: var(--edge-width);
-  transition: stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.edge-tip-warm {
-  opacity: 0.3;
-}
-
-.edge-tip-hot {
   opacity: 0.85;
+  transition:
+    stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 300ms ease;
 }
 
 /* Nothing to show when cold. In Surge the loop has closed, so there is no leading end. */

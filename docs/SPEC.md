@@ -253,7 +253,7 @@ The edge line uses the same gradient for HEAT itself, reaching yellow at 100 and
 
 ### Surge on screen
 
-Below 100 the line grows anticlockwise round the edge, down the left side first, and a full loop is 100. It brightens towards its leading end over its last stretch, as wide as the line and no wider. Above 100 the loop is closed, so Surge shows in the line itself: it thickens from 4 to 9 points, pales, glows wider, and a band of light travels slowly round it. The bright tip is hidden, since the line no longer has an end. With reduced motion the band stays still.
+Below 100 the line grows anticlockwise round the edge, down the left side first, and a full loop is 100. Its leading end is a short stretch lit close to white, as wide as the line and no wider. Above 100 the loop is closed, so Surge shows in the line itself: it thickens from 4 to 9 points, pales, glows wider, and a band of light travels slowly round it. The bright tip is hidden, since the line no longer has an end. With reduced motion the band stays still.
 
 Nothing else marks Surge. It is not named in the app, and no record is kept of reaching it.
 

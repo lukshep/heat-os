@@ -37,17 +37,14 @@ const FLARE_BLUR = 7;
 const SHIMMER_BLUR = 1.5;
 
 /**
- * The bright leading end, as lengths along the line in HEAT. It is the end of the line itself,
- * no wider than it: a longer stretch lightened a little, and a shorter one at its very end
- * lightened most, so the line brightens towards its tip. On an iPhone a unit is about 24
- * points, so the tip is about 30 points long and its brightest part about 12.
+ * The bright leading end, as a length along the line in HEAT: the line's last stretch, no wider
+ * than it, lit close to white. On an iPhone a unit is about 24 points, so it is about 12.
  */
-const TIP_LENGTH = 1.25;
-const TIP_CORE = 0.5;
+const TIP_LENGTH = 0.5;
 
-/** A stretch of the line `length` long that ends where the line ends. */
-function stretchTo(filled: number, length: number): CSSProperties {
-  return { strokeDasharray: `${length} ${FULL_HEAT}`, strokeDashoffset: length - filled };
+/** The tip: a stretch of the line TIP_LENGTH long that ends where the line ends. */
+function tipAt(filled: number): CSSProperties {
+  return { strokeDasharray: `${TIP_LENGTH} ${FULL_HEAT}`, strokeDashoffset: TIP_LENGTH - filled };
 }
 
 /** True when installed on a phone, where the app is drawn right to the edges of the glass. */
@@ -61,8 +58,8 @@ function fillsPhoneScreen(): boolean {
 /**
  * HEAT as a line of light round the edge of the screen. It starts at the top centre and
  * grows anticlockwise, down the left side first, so halfway is the bottom centre and the loop
- * closes at a full gauge. Its colour is its temperature, and it brightens towards its leading
- * end. There is no mark to reach: the line is a gauge, not a target.
+ * closes at a full gauge. Its colour is its temperature, and its leading end is lit bright.
+ * There is no mark to reach: the line is a gauge, not a target.
  *
  * Past full is Surge. The loop is closed, so the extra shows as intensity: the line
  * thickens, its glow widens, it pales towards white-hot, and a slow shimmer travels round
@@ -155,10 +152,7 @@ export function EdgeMeter({ heat }: Props) {
             />
           )}
           <path className="edge-line" d={path} pathLength={FULL_HEAT} style={line} filter="url(#edge-glow)" />
-          <g className="edge-tip" filter="url(#edge-glow)">
-            <path className="edge-tip-warm" d={path} pathLength={FULL_HEAT} style={stretchTo(filled, TIP_LENGTH)} />
-            <path className="edge-tip-hot" d={path} pathLength={FULL_HEAT} style={stretchTo(filled, TIP_CORE)} />
-          </g>
+          <path className="edge-tip" d={path} pathLength={FULL_HEAT} style={tipAt(filled)} filter="url(#edge-glow)" />
           {surge > 0 && (
             <path className="edge-shimmer" d={path} pathLength={FULL_HEAT} filter="url(#edge-shimmer-blur)" />
           )}
