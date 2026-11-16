@@ -431,6 +431,15 @@ Open after this pass:
 
 1. **Areas cannot be reordered**, and their order is now the order of the pages.
 
+### Fix — the installed app stopping short of the bottom
+
+Seen on an iPhone after M17: on a fresh launch, and sometimes after the keyboard was used, the app stopped above the bottom of the screen, with the edge line and tab bar lifted and a gap beneath, until the page was swiped down. These are two known iOS faults in web apps saved to the home screen, not in how the edge line is drawn: the line follows the app's frame, and iOS measured the screen short.
+
+- **On launch**, `100dvh` can come up short by the status bar's height in an installed app with a see-through status bar. Installed (`display-mode: standalone`), the frame is now `100vh`, the whole screen, which other developers report as the true height there. In a browser tab it keeps `100dvh`, which allows for the toolbar.
+- **After the keyboard**, iOS can leave the screen measured short until the app is quit. Scrolling the page back is reported not to help. What is reported to work is taking the full-height frame out of the layout and putting it back, which makes iOS measure again. `useFullHeight` (`src/app/fullHeight.ts`) notes the frame's height as a text field takes focus, and once the keyboard has gone, if the frame is shorter by more than a few points, refits it in one go and puts every scrolled list back. Moving between fields is not counted as the keyboard closing. Anywhere the frame keeps its height, it does nothing.
+
+Verified in a desktop browser on a production build: the frame unchanged outside an installed app and the standalone rule present in the built stylesheet; with a field used and the frame kept full height, nothing done; with the frame shortened while a field was in use, one refit, the list's scroll and the open area kept; and focus moving straight to another field left alone. The focus events were sent by hand, because the hidden pane gets none. The real faults happen only on an iPhone, so whether this cures them is not yet known.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications, reordering areas.

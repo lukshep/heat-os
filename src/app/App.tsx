@@ -10,6 +10,7 @@ import { Today } from '../screens/Today';
 import { fullDayName } from '../ui/dates';
 import { EdgeMeter } from '../ui/EdgeMeter';
 import { AreasIcon, InboxIcon, PlusIcon, SettingsIcon, TodayIcon } from '../ui/icons';
+import { useFullHeight } from './fullHeight';
 import { useActions } from './store';
 import { useView } from './view';
 
@@ -76,6 +77,8 @@ function Shell({ saving }: Props) {
   const paging = tab === 'areas' && areaIndex >= 0;
   const [undo, setUndo] = useState<{ completionId: ID; title: string } | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  useFullHeight(frameRef);
   const hasInbox = inArea(view.items, null).length > 0;
 
   useEffect(() => {
@@ -124,7 +127,7 @@ function Shell({ saving }: Props) {
   }
 
   return (
-    <div className="app">
+    <div className="app" ref={frameRef}>
       {/* HEAT runs round the edge of every screen, so no screen needs a bar of its own. */}
       <EdgeMeter heat={view.heat.heat} />
 

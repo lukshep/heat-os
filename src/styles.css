@@ -83,6 +83,17 @@ button {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+/*
+ * Installed on an iPhone, 100dvh can come up short of the screen by the status bar's height
+ * when the app opens, leaving a gap under the tab bar until the page is swiped. With no
+ * browser bars to make room for, the app is the whole screen, and 100vh says so.
+ */
+@media (display-mode: standalone) {
+  .app {
+    height: 100vh;
+  }
+}
+
 /* Every screen is headed by its name, in the same place and the same size. */
 .head {
   display: flex;
