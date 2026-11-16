@@ -25,7 +25,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M14 | Monthly routines | Built 2026-11-15; not yet deployed |
 | M15 | Dates and times on tasks | Built 2026-11-15; not yet deployed |
 | M16 | Calendar in Today | Built 2026-11-15; not yet deployed |
-| M17 | Areas | Planned |
+| M17 | Areas | Built 2026-11-15; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -411,6 +411,25 @@ Today gains a calendar, and can show a later day.
 Saved data: unchanged, still version 6. Dates are added through the existing `task/add`.
 
 Verified: unit tests for the strip's weeks, month stepping across years, month grids in two week starts and a leap February, the longer day and month names, a later day's list (order, what can be done ahead, a date done early and whose completion can be taken back) and the marks. On a production build in a desktop browser at phone size, with made-up data: the strip with dots on the right days and every day at least 46 by 60 points; Monday and Friday picked from the strip, with headings, lists, waiting routines and the "Plan for" field adding a dated Inbox task; the month grid at 46 by 44 points a day, past days disabled, no way back before this month, December reached and a day there picked, moving the strip; and the Today tab returning to today. That check found a bug, now fixed: a later day's field and list shared a key, which left old fields behind on Today. Not verified on an iPhone.
+
+### M17 — Areas
+
+The Projects tab becomes Areas (`src/screens/Areas.tsx`), with a four-tile icon in place of the folder.
+
+- **The overview** lists every area by name, with its top-level projects on a second line, and a New area field at the foot. No counts and no colour.
+- **An area's page** has an "Add to Work" field with a New project button beside it, then the area's own routines and tasks, then its projects as folding sections, unchanged from the old tree but one step less indented, since the area is the page. Tapping a project's name still opens rename, delete and "New project in …".
+- **The heading** of an open area: a back button ("All areas"), the area's name, which opens rename and delete beneath it, and arrows to the areas either side. The arrows are hidden on a touch screen (`hover: none` or `pointer: coarse`), which swipes instead.
+- **Swiping** is the browser's own: the pages sit side by side in a horizontal scroller that snaps a page at a time (`scroll-snap-type: x mandatory`, `scroll-snap-stop: always`), so it has the phone's own momentum and no gesture code. Once the scroller has been still for 120 ms, the page it rests on is the open area; when the area is chosen another way (the overview, the arrows, the keys), the scroller moves to it, smoothly unless reduced motion is asked for. Pages other than the open one are `inert`, so the keyboard stays on the page in view. Each page scrolls on its own.
+- **Where the open area lives.** The shell holds it, so Areas reopens on it after another tab. Tapping Areas with an area open goes to the overview, and an area that has been deleted falls back to it.
+- **Folding** is lifted to the pager, so one copy of the folded set is shared by every page. Only projects fold now. An area folded in the old tree is ignored, so it cannot hide its own projects with no way to open them.
+
+Saved data: unchanged, still version 6. Nothing moves: areas, projects and items keep their places, and area order is page order.
+
+Verified on a production build in a desktop browser, with made-up data. At phone size: the tab named Areas with its new icon; the overview with each area's top-level projects and no nested ones; Health's page with its items, then Fitness and Races (nested, indented a step), shown although Health had been folded in the old tree; the arrows hidden on a touch screen; moving the scroller a page at a time updating the heading, the dots and which page is live, and stopping at the last. At desktop size: the arrows labelled with their areas, disabled at the end, moving the pages; the left arrow key twice; the arrow keys ignored while a field has the cursor; renaming from the heading; adding a task and starting a project from a page; Areas reopening on the same area after Today, and going to the overview on a second tap; deleting the open area after its confirmation and landing on the overview. The browser pane was hidden, so timers were slowed and the swipe's timing could not be judged, and no real touch swipe was made. Not verified on an iPhone, where the swipe is the thing to try.
+
+Open after this pass:
+
+1. **Areas cannot be reordered**, and their order is now the order of the pages.
 
 ### Later, not planned in detail
 

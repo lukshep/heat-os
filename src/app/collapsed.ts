@@ -4,7 +4,7 @@ import type { ID } from '../data/model';
 const KEY = 'heat.collapsed';
 
 /**
- * Which areas and projects are folded shut on the Projects screen. This is how one device
+ * Which projects are folded shut on the Areas pages. This is how one device
  * likes its view, not data, so it lives in localStorage and stays out of the state document
  * and its backups.
  */

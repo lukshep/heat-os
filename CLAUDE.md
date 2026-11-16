@@ -49,7 +49,7 @@ src/
   data/      model, reducer, selectors, storage
   app/       React glue: shell, store, clock, view, backup
   ui/        presentational components, temperature colour
-  screens/   Today, Projects, Inbox, Settings
+  screens/   Today, Areas, Inbox, Settings
   dev/       DEV-only simulator and tuning screen
 public/      icons and favicon
 scripts/     make-icons.mjs, which draws the icon PNGs

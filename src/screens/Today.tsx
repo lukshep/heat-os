@@ -61,7 +61,7 @@ function TodayList({ view, onComplete }: Pick<Props, 'view' | 'onComplete'>) {
       <p className="empty">
         {view.items.length === 0
           ? 'Nothing to do yet. Capture a task with the plus button.'
-          : 'Nothing else to suggest today. Everything is still in Projects and Inbox.'}
+          : 'Nothing else to suggest today. Everything is still in Areas and Inbox.'}
       </p>
     );
   }

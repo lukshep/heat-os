@@ -27,7 +27,14 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 **Planned days.** A task can be given a day and, once it has one, a time. The editor's When row offers Today, Tomorrow, Pick (the device's own date picker) and None; Time uses the device's time picker and can be cleared. A routine has a Time but no day. Rows say when, from where today stands: "Today", "Tomorrow", "Yesterday", a weekday within the coming week, or else the date ("Nov 12"), with the time after it; on Today the day is left out and only the time shows. A planned day is not a deadline: once it passes, the task waits on Today under its date, with nothing marking it late.
 
-**Projects** shows areas, each holding tasks, routines and arbitrarily nested projects, as one tree whose sections fold shut. Projects are organisational only and have no progress. Any item can be moved to the Inbox, to the top of an area, or into any project, and an item in a project always belongs to that project's area.
+**Areas** opens on an overview: every area by name, in order, with its top-level projects on a quieter line beneath, and a field for a new area. Nothing there has a count or a colour of its own, since an area's colour would cool as it is worked and turn the overview into a record of the areas touched today. Tapping an area opens its page.
+
+- **An area's page** has a field for adding a task to it and a New project button, then the area's own routines and tasks, then its projects, nested to any depth, each a section that folds shut with its own plus button. Tapping a project's name opens rename, delete and a field for a project inside it. Routines stay where they are filed, first in their section.
+- **The heading** of an open area has a back button to the overview, and the area's name, which opens rename and delete beneath it. On a desktop it also has arrows to the areas either side, and the arrow keys do the same when no field has the cursor.
+- **Pages swipe sideways** to the next or previous area, in the areas' order, without wrapping round; grey dots under the heading show where you are. Each page keeps its own scroll.
+- **Tapping Areas** while an area is open goes back to the overview; leaving the tab and coming back reopens the same area. Deleting the open area goes back to the overview, and a new area becomes the last page.
+
+Projects are organisational only and have no progress. Any item can be moved to the Inbox, to the top of an area, or into any project, and an item in a project always belongs to that project's area.
 
 **Inbox** is frictionless capture. An inbox item is a task with no area and no project; organising it means giving it a home.
 
@@ -46,7 +53,7 @@ In the editor, **Repeat** starts with Weekly or Monthly, which only chooses the 
 
 Tasks can be completed from any section. HEAT is shown on every screen, so every completion gives feedback wherever it happens.
 
-The tab bar is icons only: Today, Projects, a plus button in the centre for capture, Inbox and Settings. Everything that is not HEAT feedback is neutral grey, so colour on a screen always means temperature.
+The tab bar is icons only: Today, Areas, a plus button in the centre for capture, Inbox and Settings. Everything that is not HEAT feedback is neutral grey, so colour on a screen always means temperature.
 
 ## Data model
 

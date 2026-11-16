@@ -31,11 +31,14 @@ export function TodayIcon() {
   );
 }
 
-/** Projects: a folder. */
-export function ProjectsIcon() {
+/** Areas: four tiles. */
+export function AreasIcon() {
   return (
     <svg {...tab}>
-      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2.2 2.5h7.2A2.5 2.5 0 0 1 21 10v6.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z" />
+      <rect x="4" y="4" width="7" height="7" rx="2" />
+      <rect x="13" y="4" width="7" height="7" rx="2" />
+      <rect x="4" y="13" width="7" height="7" rx="2" />
+      <rect x="13" y="13" width="7" height="7" rx="2" />
     </svg>
   );
 }
