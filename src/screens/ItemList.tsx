@@ -3,6 +3,7 @@ import { useActions } from '../app/store';
 import type { View } from '../app/view';
 import type { ID } from '../data/model';
 import { placeLabel, scorable, type ListItem } from '../data/selectors';
+import type { DayKey } from '../heat/day';
 import { pointsNow } from '../heat/engine';
 import { ItemRow } from '../ui/ItemRow';
 import { temperatureOf } from '../ui/temperature';
@@ -15,11 +16,14 @@ interface Props {
   showPlace?: boolean;
   /** Routines stay in this list once done for the day, shown as done. False on Today, where they leave. */
   routinesStay?: boolean;
+  /** The day this list is for. Rows planned for it show only their time. */
+  listDay?: DayKey;
   trailing?: ((item: ListItem) => ReactNode) | undefined;
 }
 
 /** A list of rows, each coloured by the points it would earn right now. One row opens at a time. */
-export function ItemList({ items, view, onComplete, showPlace = false, routinesStay = false, trailing }: Props) {
+export function ItemList(props: Props) {
+  const { items, view, onComplete, showPlace = false, routinesStay = false, listDay, trailing } = props;
   const actions = useActions();
   const [openId, setOpenId] = useState<ID | null>(null);
 
@@ -42,6 +46,8 @@ export function ItemList({ items, view, onComplete, showPlace = false, routinesS
           item={item}
           temperature={temperature(item)}
           places={view.places}
+          today={view.today}
+          listDay={listDay}
           open={openId === item.id}
           stays={routinesStay && item.kind === 'routine'}
           arrives={onScreen}

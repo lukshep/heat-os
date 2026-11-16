@@ -329,3 +329,46 @@ export type ItemCandidate = Candidate & { item: ListItem };
 export function candidate(item: ListItem): ItemCandidate {
   return { ...scorable(item), id: item.id, createdAt: item.createdAt, item };
 }
+
+const MINUTES_PER_DAY = 24 * 60;
+
+/**
+ * Minutes from the start of the day to a time. A time before the day starts belongs to that
+ * day's night, so it comes after everything else.
+ */
+export function minutesIntoDay(time: ClockTime, dayStartHour: number): number {
+  const minutes = Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  return (minutes - dayStartHour * 60 + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+}
+
+/** What Today is made of, before suggestions are picked. */
+export interface TodayPlan {
+  /**
+   * What has been settled on for today, in the order Today lists it: everything with a time, in
+   * time order, then routines that are due, late ones included, then tasks planned for today or
+   * an earlier day, earliest first.
+   */
+  settled: ListItem[];
+  /** How many of those are tasks. They take suggestion slots first. */
+  plannedTasks: number;
+  /** Tasks with no date, which suggestions are picked from. A task planned for a later day waits for it. */
+  undated: ListItem[];
+}
+
+export function planToday(items: readonly ListItem[], today: DayKey, dayStartHour: number): TodayPlan {
+  const routines = items.filter((item) => item.kind === 'routine' && item.due);
+  const planned = items
+    .filter((item) => item.kind === 'task' && item.date !== null && item.date <= today)
+    // Stable, so tasks planned for the same day keep their oldest-first order.
+    .sort((a, b) => ((a.date ?? '') < (b.date ?? '') ? -1 : (a.date ?? '') > (b.date ?? '') ? 1 : 0));
+  const settled = [...routines, ...planned];
+  const timed = settled
+    .filter((item) => item.time !== null)
+    .sort((a, b) => minutesIntoDay(a.time ?? '', dayStartHour) - minutesIntoDay(b.time ?? '', dayStartHour));
+
+  return {
+    settled: [...timed, ...settled.filter((item) => item.time === null)],
+    plannedTasks: planned.length,
+    undated: items.filter((item) => item.kind === 'task' && item.date === null),
+  };
+}

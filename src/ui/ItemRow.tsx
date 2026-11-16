@@ -1,7 +1,9 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { ItemPatch } from '../data/reducer';
 import type { ListItem, Place } from '../data/selectors';
+import { addDays, isDayKey, type DayKey } from '../heat/day';
 import { LAST_DAY, type Schedule } from '../heat/schedule';
+import { dayName, describeWhen } from './dates';
 import { CheckIcon } from './icons';
 import { heatColor } from './temperature';
 import { describeSchedule, monthDayName, weekdayName, weekdayOrder } from './weekdays';
@@ -12,6 +14,9 @@ interface Props {
   temperature: number;
   /** Every area and project, for choosing where the item lives. */
   places: readonly Place[];
+  today: DayKey;
+  /** The day the list is for, if it is for one. A row planned for it shows only its time. */
+  listDay?: DayKey | undefined;
   open: boolean;
   /** The row stays in its list once completed, so it must not fold away. True for a routine outside Today. */
   stays: boolean;
@@ -56,6 +61,7 @@ export function ItemRow(props: Props) {
   const meta = [
     context,
     item.repeat && describeSchedule(item.repeat),
+    describeWhen(item.date, item.time, props.today, props.listDay),
     item.priority && 'Priority',
     item.friction && 'Friction',
   ].filter(Boolean);
@@ -104,7 +110,7 @@ function homeKey(item: ListItem): string {
   return item.projectId === null ? `area:${item.areaId}` : `project:${item.projectId}`;
 }
 
-function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
+function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Props) {
   const [title, setTitle] = useState(item.title);
   // Which picker is showing. Switching it changes nothing until a day is chosen in it.
   const [every, setEvery] = useState<Schedule['every']>(item.repeat?.every ?? 'week');
@@ -149,6 +155,8 @@ function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
           Friction
         </Chip>
       </div>
+
+      <When item={item} today={today} onUpdate={onUpdate} />
 
       <label>
         <div className="editor-label">Keep it in</div>
@@ -218,6 +226,83 @@ function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
       </button>
     </div>
   );
+}
+
+/**
+ * A task's planned day and a time on it, or a routine's time. A planned day is not a deadline:
+ * once it passes, the task waits on Today. A task's time only shows once it has a day.
+ */
+function When({ item, today, onUpdate }: Pick<Props, 'item' | 'today' | 'onUpdate'>) {
+  const tomorrow = addDays(today, 1);
+  const picked = item.date !== null && item.date !== today && item.date !== tomorrow ? item.date : null;
+
+  return (
+    <>
+      {item.kind === 'task' && (
+        <div>
+          <div className="editor-label">When</div>
+          <div className="chips" role="group" aria-label="When">
+            <Chip pressed={item.date === today} onClick={() => onUpdate({ date: today })}>
+              Today
+            </Chip>
+            <Chip pressed={item.date === tomorrow} onClick={() => onUpdate({ date: tomorrow })}>
+              Tomorrow
+            </Chip>
+            {/* The device's own date picker, laid over the chip so a tap on the chip opens it. */}
+            <label className={picked ? 'chip chip-pick is-on' : 'chip chip-pick'}>
+              {picked ? dayName(picked, today) : 'Pick'}
+              <input
+                type="date"
+                aria-label="Pick a day"
+                value={item.date ?? ''}
+                min={today}
+                onClick={(event) => openPicker(event.currentTarget)}
+                onChange={(event) => {
+                  const { value } = event.target;
+                  if (value === '') onUpdate({ date: null });
+                  else if (isDayKey(value)) onUpdate({ date: value });
+                }}
+              />
+            </label>
+            <Chip pressed={item.date === null} onClick={() => onUpdate({ date: null })}>
+              None
+            </Chip>
+          </div>
+        </div>
+      )}
+
+      {(item.kind === 'routine' || item.date !== null) && (
+        <div>
+          <div className="editor-label">Time</div>
+          <div className="time-row">
+            <input
+              type="time"
+              aria-label="Time"
+              value={item.time ?? ''}
+              onChange={(event) => onUpdate({ time: event.target.value === '' ? null : event.target.value })}
+            />
+            {item.time !== null && (
+              <button className="text-button" type="button" onClick={() => onUpdate({ time: null })}>
+                No time
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Opens a date field's picker. A phone opens it on a tap anyway; a desktop browser only does
+ * from its small calendar button, so a click anywhere on the chip asks for it.
+ */
+function openPicker(input: HTMLInputElement): void {
+  try {
+    input.showPicker();
+  } catch {
+    // Already open, or not allowed here: the field still works by hand.
+  }
 }
 
 interface ChipProps {

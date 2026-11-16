@@ -23,7 +23,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M12 | Rings show points, not HEAT | Built 2026-11-13; not yet deployed |
 | M13 | Due dates and saved format version 6 | Built 2026-11-15; not yet deployed |
 | M14 | Monthly routines | Built 2026-11-15; not yet deployed |
-| M15 | Dates and times on tasks | Planned |
+| M15 | Dates and times on tasks | Built 2026-11-15; not yet deployed |
 | M16 | Calendar in Today | Planned |
 | M17 | Areas | Planned |
 
@@ -375,11 +375,28 @@ The editor can now make a monthly routine. The rules came with M13.
 - **The monthly picker** is the 1st to the 30th, six to a row so each stays a 44-point target at phone width, with Last day on a row of its own. The 31st is not offered: it would fall on the last day of every month, so it is the same as Last day. Each number is spoken as its ordinal ("15th").
 - **Rows name the pattern**: "Monthly · 1st, 15th", "Monthly · Last day". Ordinals are English, like the rest of the app's words; weekday names still follow the device's language.
 - **Opening early** needed nothing new on screen. A monthly routine open early has a live ring in its area and counts for its coming date, and Today lists it only from that date.
-- **Left for M15**: preselecting a dated task's day of the month when it is made monthly. No task can have a date until M15 adds the When row.
+- **Left for M15**: preselecting a dated task's day of the month when it is made monthly. No task can have a date until M15 adds the When row. (Dropped in M15.)
 
 Saved data: unchanged, still version 6.
 
 Verified: unit tests for ordinals, "Last day" and the monthly labels. On a production build in a desktop browser at phone size, with made-up data: a task made monthly on Last day, then on the 15th as well, then cleared back to a task, the editor staying open throughout; a routine on the 20th, five days away, completed early from its area, the completion counting for the 20th, and kept off Today; switching a monthly routine's picker to Weekly saving nothing; every day button at least 44 by 44 points at 375 wide. Not verified on an iPhone.
+
+### M15 — Dates and times on tasks
+
+Tasks can be planned for a day, and Today lists them first.
+
+- **The editor** gains a When row for tasks: Today, Tomorrow, Pick and None, which work like a choice of one. Pick holds the device's own date field, invisible and laid over the chip, so a tap opens the phone's picker; on a desktop the click asks the browser for its picker (`showPicker`). Once a day is picked the chip shows it. A Time field follows once the task has a day, with "No time" to clear it. A routine has the Time field and no When row.
+- **Rows say when** (`src/ui/dates.ts`): Today, Tomorrow, Yesterday, a weekday up to six days ahead, or else the date, with the year only when it is not this one, then the time in the device's own style. A list made for one day (Today, and the calendar's days in M16) leaves that day out and shows only the time.
+- **Today's order** (`planToday`): everything with a time, in time order, then due routines, then tasks planned for today or an earlier day, earliest first, then suggestions until there are five tasks. Times before the day starts sort last, as that night. Only suggestions can be swapped. Tasks planned for a later day are left out until their day, and suggestions come only from tasks with no date.
+- **Dropped: preselecting a monthly day from a task's date.** Making a task a routine drops its date, so a preselected day would have turned the task into a routine, and lost its date, the moment Monthly was tapped. Choosing the day is one more tap.
+
+Saved data: unchanged, still version 6.
+
+Verified: unit tests for the day and time labels in two locales and for Today's order (timed first, night times last, earliest planned day first, later days and finished routines left out, the planned count). On a production build in a desktop browser at phone size, with made-up data: Today in the planned order, with two suggestions after three planned tasks and only the suggestions swappable; a suggestion planned for today at 8:15 moving in among the timed items and leaving room for one suggestion, then moved to tomorrow and leaving Today with its time kept; the Pick field setting another day and opening the browser's picker without errors; None clearing the day and the time together; and a routine's time cleared from its editor. The device date and time pickers were not seen, and nothing was tried on an iPhone, where the invisible date field over the Pick chip is the part most worth checking.
+
+Open after this pass:
+
+1. **A weekly routine on one day reads like a planned task.** "Read · Wed" is a routine due every Wednesday; "Dentist · Wed" is a task planned for this Wednesday. If that confuses, weekly labels could say "Every Wed".
 
 ### Later, not planned in detail
 

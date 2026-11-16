@@ -434,6 +434,54 @@ button {
   color: var(--text);
 }
 
+/*
+ * The Pick chip holds the device's date field, invisible and covering the chip, so tapping
+ * the chip opens the device's own picker.
+ */
+.chip-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.chip.is-on {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 16%, transparent);
+  color: var(--text);
+}
+
+.editor .chip-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  /* Below 16px a phone zooms in on the field. */
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.chip-pick:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-row input {
+  flex: 1;
+}
+
 /* Weekly or Monthly, then the days. */
 .repeat {
   display: grid;
