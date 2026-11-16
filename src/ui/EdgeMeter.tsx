@@ -33,9 +33,21 @@ const SURGE_WIDTH = 5;
  */
 const GLOW = 3;
 const SURGE_GLOW = 6;
-const TIP_GLOW = 3.5;
 const FLARE_BLUR = 7;
 const SHIMMER_BLUR = 1.5;
+
+/**
+ * The bright leading end, as lengths along the line in HEAT. It is the end of the line itself,
+ * no wider than it: a longer stretch lightened a little, and a shorter one at its very end
+ * lightened most, so the line brightens towards its tip.
+ */
+const TIP_LENGTH = 4;
+const TIP_CORE = 1.5;
+
+/** A stretch of the line `length` long that ends where the line ends. */
+function stretchTo(filled: number, length: number): CSSProperties {
+  return { strokeDasharray: `${length} ${FULL_HEAT}`, strokeDashoffset: length - filled };
+}
 
 /** True when installed on a phone, where the app is drawn right to the edges of the glass. */
 function fillsPhoneScreen(): boolean {
@@ -47,9 +59,9 @@ function fillsPhoneScreen(): boolean {
 
 /**
  * HEAT as a line of light round the edge of the screen. It starts at the top centre and
- * grows clockwise, so halfway is the bottom centre and the loop closes at a full gauge. Its
- * colour is its temperature and a bright tip marks the leading end. There is no mark to
- * reach: the line is a gauge, not a target.
+ * grows anticlockwise, down the left side first, so halfway is the bottom centre and the loop
+ * closes at a full gauge. Its colour is its temperature, and it brightens towards its leading
+ * end. There is no mark to reach: the line is a gauge, not a target.
  *
  * Past full is Surge. The loop is closed, so the extra shows as intensity: the line
  * thickens, its glow widens, it pales towards white-hot, and a slow shimmer travels round
@@ -87,7 +99,6 @@ export function EdgeMeter({ heat }: Props) {
   const path = edgePath(shape);
   // pathLength makes the path one full gauge long, so offsets are HEAT itself.
   const line = { strokeDasharray: `${FULL_HEAT} ${FULL_HEAT}`, strokeDashoffset: FULL_HEAT - filled };
-  const tip = { strokeDasharray: `0.001 ${FULL_HEAT}`, strokeDashoffset: -filled };
 
   const className = ['edge', level < COLD && 'is-cold', surge > 0 && 'is-surging'].filter(Boolean).join(' ');
   const style = {
@@ -124,9 +135,6 @@ export function EdgeMeter({ heat }: Props) {
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
-            <filter id="edge-tip-glow" colorInterpolationFilters="sRGB">
-              <feGaussianBlur stdDeviation={TIP_GLOW} />
-            </filter>
             <filter id="edge-flare-blur" colorInterpolationFilters="sRGB">
               <feGaussianBlur stdDeviation={FLARE_BLUR} />
             </filter>
@@ -146,9 +154,9 @@ export function EdgeMeter({ heat }: Props) {
             />
           )}
           <path className="edge-line" d={path} pathLength={FULL_HEAT} style={line} filter="url(#edge-glow)" />
-          <g className="edge-tip">
-            <path className="edge-tip-glow" d={path} pathLength={FULL_HEAT} style={tip} filter="url(#edge-tip-glow)" />
-            <path className="edge-tip-dot" d={path} pathLength={FULL_HEAT} style={tip} />
+          <g className="edge-tip" filter="url(#edge-glow)">
+            <path className="edge-tip-warm" d={path} pathLength={FULL_HEAT} style={stretchTo(filled, TIP_LENGTH)} />
+            <path className="edge-tip-hot" d={path} pathLength={FULL_HEAT} style={stretchTo(filled, TIP_CORE)} />
           </g>
           {surge > 0 && (
             <path className="edge-shimmer" d={path} pathLength={FULL_HEAT} filter="url(#edge-shimmer-blur)" />

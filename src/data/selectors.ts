@@ -239,8 +239,10 @@ export interface ListItem {
   areaId: ID | null;
   /** The project it sits in, or null for the top of its area. Never a project that no longer exists. */
   projectId: ID | null;
+  /** Listed first, wherever it is listed. */
   priority: boolean;
-  friction: boolean;
+  /** Stars of Friction, 0 to FRICTION_STARS. */
+  friction: number;
   createdAt: number;
   /** A task's planned day. Null for an undated task and for a routine. */
   date: DayKey | null;
@@ -321,7 +323,7 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
 
 /** What the engine needs to price an item. */
 export function scorable(item: ListItem): Scorable {
-  return { areaId: item.areaId, priority: item.priority, friction: item.friction, warmth: item.warmth };
+  return { areaId: item.areaId, friction: item.friction, warmth: item.warmth };
 }
 
 export type ItemCandidate = Candidate & { item: ListItem };
@@ -341,17 +343,28 @@ export function minutesIntoDay(time: ClockTime, dayStartHour: number): number {
   return (minutes - dayStartHour * 60 + MINUTES_PER_DAY) % MINUTES_PER_DAY;
 }
 
+/**
+ * Priority items first, then the rest, each keeping the order it was given in. Every list puts
+ * Priority at its top this way; it changes nothing else about the order.
+ */
+export function priorityFirst<T extends Pick<ListItem, 'priority'>>(items: readonly T[]): T[] {
+  return [...items.filter((item) => item.priority), ...items.filter((item) => !item.priority)];
+}
+
 /** What Today is made of, before suggestions are picked. */
 export interface TodayPlan {
   /**
-   * What has been settled on for today, in the order Today lists it: everything with a time, in
-   * time order, then routines that are due, late ones included, then tasks planned for today or
-   * an earlier day, earliest first.
+   * What has been settled on for today, in the order Today lists it: Priority first, then
+   * everything with a time, in time order, then routines that are due, late ones included, then
+   * tasks planned for today or an earlier day, earliest first, then Priority tasks with no date.
    */
   settled: ListItem[];
   /** How many of those are tasks. They take suggestion slots first. */
   plannedTasks: number;
-  /** Tasks with no date, which suggestions are picked from. A task planned for a later day waits for it. */
+  /**
+   * Tasks with no date and no Priority, which suggestions are picked from. A task planned for a
+   * later day waits for it, and a Priority task with no date is on Today already.
+   */
   undated: ListItem[];
 }
 
@@ -361,10 +374,12 @@ export function planToday(items: readonly ListItem[], today: DayKey, dayStartHou
     .filter((item) => item.kind === 'task' && item.date !== null && item.date <= today)
     // Stable, so tasks planned for the same day keep their oldest-first order.
     .sort((a, b) => ((a.date ?? '') < (b.date ?? '') ? -1 : (a.date ?? '') > (b.date ?? '') ? 1 : 0));
+  const undated = items.filter((item) => item.kind === 'task' && item.date === null);
+  const chosen = undated.filter((item) => item.priority);
   return {
-    settled: timedFirst([...routines, ...planned], dayStartHour),
-    plannedTasks: planned.length,
-    undated: items.filter((item) => item.kind === 'task' && item.date === null),
+    settled: priorityFirst(timedFirst([...routines, ...planned, ...chosen], dayStartHour)),
+    plannedTasks: planned.length + chosen.length,
+    undated: undated.filter((item) => !item.priority),
   };
 }
 
@@ -377,8 +392,8 @@ function timedFirst(items: readonly ListItem[], dayStartHour: number): ListItem[
 }
 
 /**
- * What a later day holds: the tasks planned for it and the routines due on it, timed ones
- * first, then routines, then tasks. A routine's row speaks for that day's date: done if it was
+ * What a later day holds: the tasks planned for it and the routines due on it, Priority first,
+ * then timed ones, then routines, then tasks. A routine's row speaks for that day's date: done if it was
  * done early, open if it has opened early, and otherwise not open yet (`occurrence` null).
  */
 export function dayList(state: AppState, items: readonly ListItem[], day: DayKey, dayStartHour: number): ListItem[] {
@@ -396,7 +411,7 @@ export function dayList(state: AppState, items: readonly ListItem[], day: DayKey
     const occurrence = !done && item.occurrence === day ? day : null;
     rows.push({ ...item, due: false, done, undoId, occurrence });
   }
-  return timedFirst(rows, dayStartHour);
+  return priorityFirst(timedFirst(rows, dayStartHour));
 }
 
 /**

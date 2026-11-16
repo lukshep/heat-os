@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, STANDARD_TUNING, tuned, type Tuning } from '../heat/config';
 import { DAY_MS } from '../heat/day';
-import { foldHeat } from '../heat/engine';
+import { foldHeat, frictionFactor } from '../heat/engine';
 import {
   createInitialState,
   currentTuning,
@@ -37,11 +37,27 @@ function eachRecord(collection: Record<string, any>, change: (record: any) => an
 }
 
 /**
+ * A current document as version 6 saved it: Priority and Friction as tags on tasks, routines
+ * and completions alike.
+ */
+function versionSix(): Record<string, any> {
+  const document = current();
+  const asTag = (record: any) => ({ ...record, friction: record.friction > 0 });
+  return {
+    ...document,
+    schemaVersion: 6,
+    tasks: eachRecord(document.tasks, asTag),
+    routines: eachRecord(document.routines, asTag),
+    completions: eachRecord(document.completions, (completion) => ({ ...asTag(completion), priority: false })),
+  };
+}
+
+/**
  * A current document as version 5 saved it: no dates or times, schedules that were always
  * weekly, and completions that said whether their day was scheduled.
  */
 function versionFive(): Record<string, any> {
-  const document = current();
+  const document = versionSix();
   return {
     ...document,
     schemaVersion: 5,
@@ -387,9 +403,9 @@ describe('saved data from before the tags were renamed (version 4)', () => {
   it('renames Important to Priority and Avoided to Friction, keeping every value', () => {
     const state = parseState(tagged());
     expect(state?.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(state?.tasks.t1).toMatchObject({ priority: true, friction: false });
-    expect(state?.routines.r1).toMatchObject({ priority: false, friction: true });
-    expect(state?.completions.c1).toMatchObject({ priority: false, friction: true });
+    expect(state?.tasks.t1).toMatchObject({ priority: true, friction: 0 });
+    expect(state?.routines.r1).toMatchObject({ priority: false, friction: 3 });
+    expect(state?.completions.c1).toMatchObject({ friction: 3 });
   });
 
   it('leaves no trace of the old names', () => {
@@ -405,7 +421,7 @@ describe('saved data from before the tags were renamed (version 4)', () => {
     const state = parseState(old);
     const now = current();
     expect(state?.tasks).toEqual({ t1: { ...now.tasks.t1, priority: true } });
-    expect(state?.completions).toEqual({ c1: { ...now.completions.c1, friction: true } });
+    expect(state?.completions).toEqual({ c1: { ...now.completions.c1, friction: 3 } });
     expect(state?.settings).toEqual(old.settings);
     expect(state?.areas).toEqual(old.areas);
   });
@@ -486,8 +502,8 @@ describe('saved data from before dates and monthly routines (version 5)', () => 
   it('keeps everything else exactly as it was', () => {
     const old = withRoutine();
     const state = parseState(old);
-    const { scheduled: _scheduled, ...rest } = old.completions.c2;
-    expect(state?.completions.c2).toEqual({ ...rest, occurrence: '2026-01-05' });
+    const { scheduled: _scheduled, priority: _priority, ...rest } = old.completions.c2;
+    expect(state?.completions.c2).toEqual({ ...rest, friction: 0, occurrence: '2026-01-05' });
     expect(state?.areas).toEqual(old.areas);
     expect(state?.settings).toEqual(old.settings);
     expect(state?.deferred).toEqual(old.deferred);
@@ -505,5 +521,101 @@ describe('saved data from before dates and monthly routines (version 5)', () => 
     const old = withRoutine();
     delete old.completions.c2.scheduled;
     expect(parseState(old)).toBeNull();
+  });
+});
+
+describe('saved data from before Friction had stars (version 6)', () => {
+  /**
+   * A version 6 document: a task with both tags, a routine with Priority, and four completions,
+   * one with each mix of tags.
+   */
+  function tagged(): Record<string, any> {
+    const old = versionSix();
+    old.tasks.t1 = { ...old.tasks.t1, priority: true, friction: true };
+    old.routines.r1 = {
+      id: 'r1',
+      createdAt: 2000,
+      updatedAt: 2000,
+      deletedAt: null,
+      title: 'Run',
+      areaId: 'a1',
+      projectId: null,
+      priority: true,
+      friction: false,
+      time: null,
+      schedule: { every: 'week', days: [1] },
+      warmthBase: { warmth: 0, missRun: 0, asOf: '2026-01-04' },
+    };
+    const completion = old.completions.c1;
+    old.completions.c1 = { ...completion, priority: false, friction: true };
+    old.completions.c2 = { ...completion, id: 'c2', priority: true, friction: false };
+    old.completions.c3 = { ...completion, id: 'c3', priority: true, friction: true };
+    old.completions.c4 = { ...completion, id: 'c4', priority: false, friction: false };
+    return old;
+  }
+
+  it('is brought up to the current version', () => {
+    expect(parseState(tagged())?.schemaVersion).toBe(SCHEMA_VERSION);
+  });
+
+  it('gives Friction three stars on tasks and routines, and keeps Priority on them', () => {
+    const state = parseState(tagged());
+    expect(state?.tasks.t1).toMatchObject({ priority: true, friction: 3 });
+    expect(state?.routines.r1).toMatchObject({ priority: true, friction: 0 });
+  });
+
+  it('gives each completion the stars that earn what its tags earned, and takes Priority off it', () => {
+    const completions = parseState(tagged())?.completions ?? {};
+    expect([completions.c1, completions.c2, completions.c3, completions.c4].map((entry) => entry?.friction)).toEqual([
+      3, 2, 5, 0,
+    ]);
+    for (const completion of Object.values(completions)) expect(completion).not.toHaveProperty('priority');
+  });
+
+  it('leaves what each completion earned where it was: 30% for Friction, 20% for Priority, 50% for both', () => {
+    const completions = parseState(tagged())?.completions ?? {};
+    const share = (id: string) =>
+      frictionFactor({ areaId: null, friction: completions[id]?.friction ?? -1, warmth: 0 }, DEFAULT_CONFIG) - 1;
+    expect(share('c1')).toBeCloseTo(0.3, 10);
+    expect(share('c2')).toBeCloseTo(0.2, 10);
+    expect(share('c3')).toBeCloseTo(0.5, 10);
+    expect(share('c4')).toBe(0);
+  });
+
+  it('keeps everything else exactly as it was', () => {
+    const old = tagged();
+    const state = parseState(old);
+    const { priority: _priority, ...rest } = old.completions.c1;
+    expect(state?.completions.c1).toEqual({ ...rest, friction: 3 });
+    expect(state?.tasks.t1).toEqual({ ...old.tasks.t1, friction: 3 });
+    expect(state?.areas).toEqual(old.areas);
+    expect(state?.settings).toEqual(old.settings);
+  });
+
+  it('does not alter the document it was given', () => {
+    const old = tagged();
+    const before = JSON.stringify(old);
+    parseState(old);
+    expect(JSON.stringify(old)).toBe(before);
+  });
+
+  it('is refused when a tag is damaged', () => {
+    const task = tagged();
+    task.tasks.t1.friction = 2;
+    expect(parseState(task)).toBeNull();
+
+    const completion = tagged();
+    delete completion.completions.c2.priority;
+    expect(parseState(completion)).toBeNull();
+  });
+});
+
+describe('Friction stars', () => {
+  it('are refused when they are not a whole number from none to five', () => {
+    for (const friction of [6, -1, 2.5, true, '3']) {
+      const document = current();
+      document.tasks.t1.friction = friction;
+      expect(parseState(document)).toBeNull();
+    }
   });
 });

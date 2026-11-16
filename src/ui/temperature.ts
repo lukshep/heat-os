@@ -1,4 +1,4 @@
-import type { HeatConfig } from '../heat/config';
+import { FRICTION_STARS, type HeatConfig } from '../heat/config';
 import { pointsFor, type DayPosition, type Scorable } from '../heat/engine';
 
 interface Stop {
@@ -52,8 +52,8 @@ export function heatColor(temperature: number): string {
   return 'oklch(0.975 0.07 102)';
 }
 
-/** The most any item can earn: a fully warm routine with both tags, the first thing done in a day. */
-const HOTTEST_ITEM: Scorable = { areaId: 'hottest', priority: true, friction: true, warmth: 1 };
+/** The most any item can earn: a fully warm routine with every star of Friction, the first thing done in a day. */
+const HOTTEST_ITEM: Scorable = { areaId: 'hottest', friction: FRICTION_STARS, warmth: 1 };
 const START_OF_DAY: DayPosition = { inArea: 0, areasOpened: 0 };
 
 /** Below 1 this lifts small rewards, so everyday items do not all crowd the cold end. */

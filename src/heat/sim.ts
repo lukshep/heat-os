@@ -1,7 +1,7 @@
 import { FULL_HEAT, type HeatConfig } from './config';
 import { addDays, dayKeyAt, DAY_MS, HOUR_MS, type DayKey } from './day';
 import { traceHeat, type CompletionFact, type ScoredCompletion } from './engine';
-import type { Schedule } from './schedule';
+import { DAILY } from './schedule';
 import { warmthAt, type WarmthBase } from './warmth';
 
 /** A repeating pattern of behaviour to play through the engine. */
@@ -15,9 +15,9 @@ export interface Scenario {
   areas: number;
   /** Tasks completed on an active day, dealt round-robin across the areas. */
   tasks: number;
-  /** How many of the day's tasks are tagged Priority and Friction; the earliest tasks get the tags. */
-  priority: number;
-  friction: number;
+  /** How many of the day's tasks have Friction, the earliest first, and how many stars each has. */
+  starred: number;
+  stars: number;
   /** Daily routines, dealt across the areas and done before any task on an active day. */
   routines: number;
   /** Skip the routines on every Nth active day. 0 never skips. */
@@ -53,7 +53,6 @@ export interface SimResult {
 /** A Monday, so day 0 of every run is the same weekday. The simulated clock is UTC. */
 const START_DAY: DayKey = '2026-01-05';
 const START_MS = Date.UTC(2026, 0, 5);
-const EVERY_DAY: Schedule = { every: 'week', days: [0, 1, 2, 3, 4, 5, 6] };
 
 function wholeNumber(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
@@ -107,13 +106,12 @@ export function buildRun(scenario: Scenario, config: HeatConfig, days: number): 
 
       if (skipEvery === 0 || activeDays % skipEvery !== 0) {
         for (const routine of routines) {
-          const { warmth } = warmthAt(routine.base, EVERY_DAY, routine.done, today, config);
+          const { warmth } = warmthAt(routine.base, DAILY, routine.done, today, config);
           planned.push({
             itemId: routine.itemId,
             kind: 'routine',
             areaId: routine.areaId,
-            priority: false,
-            friction: false,
+            friction: 0,
             warmth,
           });
           routine.done.add(today);
@@ -125,8 +123,7 @@ export function buildRun(scenario: Scenario, config: HeatConfig, days: number): 
           itemId: `task-${day}-${task}`,
           kind: 'task',
           areaId: `area-${task % areas}`,
-          priority: task < scenario.priority,
-          friction: task < scenario.friction,
+          friction: task < scenario.starred ? scenario.stars : 0,
           warmth: 0,
         });
       }
@@ -145,7 +142,7 @@ export function buildRun(scenario: Scenario, config: HeatConfig, days: number): 
 
     // Settle today for every routine, so tomorrow starts from the right warmth.
     for (const routine of routines) {
-      const settled = warmthAt(routine.base, EVERY_DAY, routine.done, addDays(today, 1), config);
+      const settled = warmthAt(routine.base, DAILY, routine.done, addDays(today, 1), config);
       routine.base = { ...settled, asOf: today };
     }
   }
@@ -215,7 +212,7 @@ function daysInSurge(heat: number, spanDays: number, config: HeatConfig): number
 }
 
 const EVERY_DAY_ON = { daysOn: 1, daysOff: 0 };
-const NO_TAGS = { priority: 0, friction: 0 };
+const NO_FRICTION = { starred: 0, stars: 0 };
 const NO_ROUTINES = { routines: 0, skipRoutinesEvery: 0 };
 const ONE_SITTING = { fromHour: 18, toHour: 18 };
 const THROUGH_THE_DAY = { fromHour: 8, toHour: 20 };
@@ -225,66 +222,66 @@ export const SCENARIOS: readonly [Scenario, ...Scenario[]] = [
   {
     name: 'Balanced day',
     note: 'Two tasks in each of four areas, every day. Consistent, balanced activity should sit at about 70 to 85.',
-    ...EVERY_DAY_ON, areas: 4, tasks: 8, ...NO_TAGS, ...NO_ROUTINES, ...ONE_SITTING,
+    ...EVERY_DAY_ON, areas: 4, tasks: 8, ...NO_FRICTION, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
-    name: 'Balanced day, one task tagged',
-    note: 'The balanced day with its first task tagged Priority and Friction. Tags lift it a little.',
-    ...EVERY_DAY_ON, areas: 4, tasks: 8, priority: 1, friction: 1, ...NO_ROUTINES, ...ONE_SITTING,
+    name: 'Balanced day, one hard task',
+    note: 'The balanced day with five stars of Friction on its first task. Friction lifts it a little.',
+    ...EVERY_DAY_ON, areas: 4, tasks: 8, starred: 1, stars: 5, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Light day',
     note: 'Two tasks in each of three areas, every day. Lower than a balanced day, but not punished.',
-    ...EVERY_DAY_ON, areas: 3, tasks: 6, ...NO_TAGS, ...NO_ROUTINES, ...ONE_SITTING,
+    ...EVERY_DAY_ON, areas: 3, tasks: 6, ...NO_FRICTION, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Big day',
-    note: 'Three tasks in each of four areas, the first tagged with both, every day. High, but still short of a full gauge.',
-    ...EVERY_DAY_ON, areas: 4, tasks: 12, priority: 1, friction: 1, ...NO_ROUTINES, ...ONE_SITTING,
+    note: 'Three tasks in each of four areas, the first with five stars, every day. High, but still short of a full gauge.',
+    ...EVERY_DAY_ON, areas: 4, tasks: 12, starred: 1, stars: 5, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Huge day',
-    note: 'Three daily routines plus twelve tasks, the first two tagged with both, every day. This is what Surge takes.',
-    ...EVERY_DAY_ON, areas: 4, tasks: 12, priority: 2, friction: 2, routines: 3, skipRoutinesEvery: 0, ...ONE_SITTING,
+    note: 'Three daily routines plus twelve tasks, the first two with five stars, every day. This is what Surge takes.',
+    ...EVERY_DAY_ON, areas: 4, tasks: 12, starred: 2, stars: 5, routines: 3, skipRoutinesEvery: 0, ...ONE_SITTING,
   },
   {
     name: 'One task per area',
     note: 'One task in each of five areas, every day. Breadth with no depth.',
-    ...EVERY_DAY_ON, areas: 5, tasks: 5, ...NO_TAGS, ...NO_ROUTINES, ...ONE_SITTING,
+    ...EVERY_DAY_ON, areas: 5, tasks: 5, ...NO_FRICTION, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'One-area grind',
     note: 'Five tasks a day, all in one area. Volume without balance should sit well below a balanced day.',
-    ...EVERY_DAY_ON, areas: 1, tasks: 5, ...NO_TAGS, ...NO_ROUTINES, ...ONE_SITTING,
+    ...EVERY_DAY_ON, areas: 1, tasks: 5, ...NO_FRICTION, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Task splitter',
     note: 'Twenty tiny tasks a day in one area. Splitting work must not beat the one-area ceiling.',
-    ...EVERY_DAY_ON, areas: 1, tasks: 20, ...NO_TAGS, ...NO_ROUTINES, ...ONE_SITTING,
+    ...EVERY_DAY_ON, areas: 1, tasks: 20, ...NO_FRICTION, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
-    name: 'Tag everything',
-    note: 'The balanced day with every task tagged Priority and Friction. Tags are a share of the reward, so this stays short of Surge.',
-    ...EVERY_DAY_ON, areas: 4, tasks: 8, priority: 8, friction: 8, ...NO_ROUTINES, ...ONE_SITTING,
+    name: 'Five stars everywhere',
+    note: 'The balanced day with five stars of Friction on every task. Friction is a share of the reward, so this stays short of Surge.',
+    ...EVERY_DAY_ON, areas: 4, tasks: 8, starred: 8, stars: 5, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Weekend warrior',
     note: 'Two big days, then five days of nothing. Bursts should not stand in for consistency.',
-    daysOn: 2, daysOff: 5, areas: 4, tasks: 12, priority: 1, friction: 1, ...NO_ROUTINES, ...ONE_SITTING,
+    daysOn: 2, daysOff: 5, areas: 4, tasks: 12, starred: 1, stars: 5, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Week off',
     note: 'Two weeks of balanced days, then a week away. Watch how far HEAT falls and how fast it comes back.',
-    daysOn: 14, daysOff: 7, areas: 4, tasks: 8, ...NO_TAGS, ...NO_ROUTINES, ...ONE_SITTING,
+    daysOn: 14, daysOff: 7, areas: 4, tasks: 8, ...NO_FRICTION, ...NO_ROUTINES, ...ONE_SITTING,
   },
   {
     name: 'Routines, kept',
     note: 'Three daily routines plus three tasks. The same effort is worth more as the routines warm.',
-    ...EVERY_DAY_ON, areas: 3, tasks: 3, ...NO_TAGS, routines: 3, skipRoutinesEvery: 0, ...THROUGH_THE_DAY,
+    ...EVERY_DAY_ON, areas: 3, tasks: 3, ...NO_FRICTION, routines: 3, skipRoutinesEvery: 0, ...THROUGH_THE_DAY,
   },
   {
     name: 'Routines, patchy',
     note: 'The same, but the routines are skipped every third day. Lost warmth and lost days pull it down.',
-    ...EVERY_DAY_ON, areas: 3, tasks: 3, ...NO_TAGS, routines: 3, skipRoutinesEvery: 3, ...THROUGH_THE_DAY,
+    ...EVERY_DAY_ON, areas: 3, tasks: 3, ...NO_FRICTION, routines: 3, skipRoutinesEvery: 3, ...THROUGH_THE_DAY,
   },
 ];

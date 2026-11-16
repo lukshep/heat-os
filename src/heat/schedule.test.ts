@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { MONTHLY_EARLY_DAYS } from './config';
 import { addDays, type DayKey } from './day';
-import { LAST_DAY, lastOccurrence, nextOccurrence, occurrenceNow, occursOn, type Schedule } from './schedule';
+import {
+  DAILY,
+  isDaily,
+  LAST_DAY,
+  lastOccurrence,
+  nextOccurrence,
+  occurrenceNow,
+  occursOn,
+  type Schedule,
+} from './schedule';
 
 // 4 January 2026 is a Sunday.
 const MON_THU: Schedule = { every: 'week', days: [1, 4] };
@@ -46,6 +55,19 @@ describe('occursOn', () => {
     const both: Schedule = { every: 'month', days: [30, LAST_DAY] };
     expect(datesIn(both, '2026-02-01', '2026-02-28')).toEqual(['2026-02-28']);
     expect(datesIn(both, '2026-03-01', '2026-03-31')).toEqual(['2026-03-30', '2026-03-31']);
+  });
+});
+
+describe('isDaily', () => {
+  it('is true only for a weekly schedule on all seven days', () => {
+    expect(isDaily(DAILY)).toBe(true);
+    expect(isDaily({ every: 'week', days: [6, 5, 4, 3, 2, 1, 0] })).toBe(true);
+    expect(isDaily({ every: 'week', days: [1, 2, 3, 4, 5] })).toBe(false);
+    expect(isDaily({ every: 'month', days: [1, 2, 3, 4, 5, 6, 7] })).toBe(false);
+  });
+
+  it('is due on every day', () => {
+    expect(datesIn(DAILY, '2026-01-04', '2026-01-10')).toHaveLength(7);
   });
 });
 

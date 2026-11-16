@@ -287,11 +287,11 @@ describe('editing a routine', () => {
     const later = run(
       state,
       complete('c1', MONDAY, 0.5),
-      { type: 'routine/update', id: 'run', at: 4000, patch: { areaId: home, friction: true } },
+      { type: 'routine/update', id: 'run', at: 4000, patch: { areaId: home, friction: 3 } },
       { type: 'routine/delete', id: 'run', at: 4500 },
     );
     expect(liveCompletions(later)).toEqual([
-      expect.objectContaining({ areaId: health, friction: false, warmth: 0.5, occurrence: MONDAY }),
+      expect.objectContaining({ areaId: health, friction: 0, warmth: 0.5, occurrence: MONDAY }),
     ]);
     expect(listItems(later, TUESDAY, config)).toEqual([]);
   });
@@ -302,7 +302,7 @@ describe('going back to a one-off task', () => {
     const { state, health } = withRoutine();
     const back = run(
       state,
-      { type: 'routine/update', id: 'run', at: 4000, patch: { title: 'Morning run', friction: true, time: '07:30' } },
+      { type: 'routine/update', id: 'run', at: 4000, patch: { title: 'Morning run', friction: 3, time: '07:30' } },
       { type: 'routine/makeTask', id: 'run', at: 4500 },
     );
     expect(listItems(back, MONDAY, config)).toEqual([
@@ -310,7 +310,7 @@ describe('going back to a one-off task', () => {
         id: 'run',
         kind: 'task',
         title: 'Morning run',
-        friction: true,
+        friction: 3,
         areaId: health,
         date: null,
         time: null,

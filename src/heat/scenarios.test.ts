@@ -22,8 +22,8 @@ function daily(overrides: Partial<Scenario>): Scenario {
     daysOff: 0,
     areas: 1,
     tasks: 1,
-    priority: 0,
-    friction: 0,
+    starred: 0,
+    stars: 0,
     routines: 0,
     skipRoutinesEvery: 0,
     fromHour: 18,
@@ -33,16 +33,16 @@ function daily(overrides: Partial<Scenario>): Scenario {
 }
 
 const BALANCED = daily({ areas: 4, tasks: 8 });
-const BALANCED_TAGGED = daily({ areas: 4, tasks: 8, priority: 1, friction: 1 });
+const BALANCED_HARD = daily({ areas: 4, tasks: 8, starred: 1, stars: 5 });
 const LIGHT = daily({ areas: 3, tasks: 6 });
-const BIG = daily({ areas: 4, tasks: 12, priority: 1, friction: 1 });
-const HUGE = daily({ areas: 4, tasks: 12, priority: 2, friction: 2, routines: 3 });
+const BIG = daily({ areas: 4, tasks: 12, starred: 1, stars: 5 });
+const HUGE = daily({ areas: 4, tasks: 12, starred: 2, stars: 5, routines: 3 });
 const ONE_PER_AREA = daily({ areas: 5, tasks: 5 });
 const ONE_AREA_UNLIMITED = daily({ areas: 1, tasks: 200 });
 const ROUTINES_AND_TASKS = daily({ areas: 3, tasks: 3, routines: 3, fromHour: 8, toHour: 20 });
 
 const SETTLED = 56;
-const plain: Scorable = { areaId: 'work', priority: false, friction: false, warmth: 0 };
+const plain: Scorable = { areaId: 'work', friction: 0, warmth: 0 };
 const cold: HeatState = { heat: 0, now: 0, today: '2026-01-05', areaCounts: {} };
 
 function pointsADay(scenario: Scenario): number {
@@ -86,7 +86,7 @@ describe('design invariants', () => {
   });
 
   it('never passes the ceiling, even under absurd farming', () => {
-    const absurd = daily({ areas: 6, tasks: 300, priority: 300, friction: 300, routines: 6 });
+    const absurd = daily({ areas: 6, tasks: 300, starred: 300, stars: 5, routines: 6 });
     const heats = simulate(absurd, config, 60).samples.map((sample) => sample.heat);
     expect(Math.min(...heats)).toBeGreaterThanOrEqual(0);
     expect(Math.max(...heats)).toBeLessThanOrEqual(MAX_HEAT);
@@ -124,31 +124,28 @@ describe('design invariants', () => {
     expect(Math.max(...thirdDayBack.map((sample) => sample.heat))).toBeGreaterThan(70);
   });
 
-  it('adds 20% for Priority, 30% for Friction and 50% for both, wherever the task falls', () => {
-    const shareAt = (tags: Partial<Scorable>, inArea: number) => {
+  it('adds 10% for each star of Friction, up to 50% for five, wherever the task falls', () => {
+    const shareAt = (friction: number, inArea: number) => {
       const position = { inArea, areasOpened: 1 };
-      return pointsFor({ ...plain, ...tags }, position, config) / pointsFor(plain, position, config) - 1;
+      return pointsFor({ ...plain, friction }, position, config) / pointsFor(plain, position, config) - 1;
     };
     for (const inArea of [0, 3, 6]) {
-      expect(shareAt({ priority: true }, inArea)).toBeCloseTo(0.2, 10);
-      expect(shareAt({ friction: true }, inArea)).toBeCloseTo(0.3, 10);
-      expect(shareAt({ priority: true, friction: true }, inArea)).toBeCloseTo(0.5, 10);
+      for (const stars of [1, 2, 3, 4, 5]) expect(shareAt(stars, inArea)).toBeCloseTo(stars / 10, 10);
     }
   });
 
-  it('keeps a first task in a fresh area worth more than a repeat with both tags', () => {
-    const both: Scorable = { ...plain, priority: true, friction: true };
-    const taggedRepeat = pointsFor(both, { inArea: 1, areasOpened: 1 }, config);
+  it('keeps a first task in a fresh area worth more than a repeat with five stars', () => {
+    const hardRepeat = pointsFor({ ...plain, friction: 5 }, { inArea: 1, areasOpened: 1 }, config);
     const freshArea = pointsFor(plain, { inArea: 0, areasOpened: 1 }, config);
-    expect(freshArea).toBeGreaterThan(taggedRepeat);
+    expect(freshArea).toBeGreaterThan(hardRepeat);
   });
 
-  it('lifts a balanced day when its first task is tagged with both', () => {
-    expect(settled(BALANCED_TAGGED).settledPeak).toBeGreaterThan(settled(BALANCED).settledPeak + 2);
+  it('lifts a balanced day when its first task has five stars', () => {
+    expect(settled(BALANCED_HARD).settledPeak).toBeGreaterThan(settled(BALANCED).settledPeak + 2);
   });
 
-  it('keeps Surge out of reach of tags alone: every task of a balanced day tagged with both', () => {
-    expect(settled(daily({ areas: 4, tasks: 8, priority: 8, friction: 8 })).surgeShare).toBe(0);
+  it('keeps Surge out of reach of Friction alone: every task of a balanced day with five stars', () => {
+    expect(settled(daily({ areas: 4, tasks: 8, starred: 8, stars: 5 })).surgeShare).toBe(0);
   });
 
   it('pays less than four times as much for one task split into twenty', () => {
@@ -209,7 +206,7 @@ describe('calibration snapshot', () => {
     ['one task in each of 5 areas', ONE_PER_AREA, 76, 61],
     ['light day', LIGHT, 77, 61],
     ['balanced day', BALANCED, 85, 68],
-    ['balanced day, first task tagged with both', BALANCED_TAGGED, 87, 70],
+    ['balanced day, first task with five stars', BALANCED_HARD, 87, 70],
     ['big day', BIG, 94, 75],
     ['huge day', HUGE, 104, 85],
     ['one area, unlimited tasks', ONE_AREA_UNLIMITED, 71, 57],
@@ -223,7 +220,7 @@ describe('calibration snapshot', () => {
 
   it('scores the reference days as the spec says', () => {
     expect(pointsADay(BALANCED)).toBeCloseTo(84.67, 2);
-    expect(pointsADay(BALANCED_TAGGED)).toBeCloseTo(92.17, 2);
+    expect(pointsADay(BALANCED_HARD)).toBeCloseTo(92.17, 2);
     expect(pointsADay(LIGHT)).toBeCloseTo(64.95, 2);
   });
 

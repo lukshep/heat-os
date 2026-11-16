@@ -6,7 +6,7 @@ import { TEST_CONFIG as config } from './testConfig';
 const state: HeatState = { heat: 40, now: 0, today: '2026-01-05', areaCounts: {} };
 
 function candidate(id: string, areaId: string | null, overrides: Partial<Candidate> = {}): Candidate {
-  return { id, areaId, priority: false, friction: false, warmth: 0, createdAt: 0, ...overrides };
+  return { id, areaId, friction: 0, warmth: 0, createdAt: 0, ...overrides };
 }
 
 function ids(picks: Candidate[]): string[] {
@@ -32,17 +32,17 @@ describe('suggest', () => {
     expect(ids(suggest(pool, worked, config, 1))).toEqual(['h1']);
   });
 
-  it('prefers tagged and warm items within an area', () => {
+  it('prefers items with more Friction, and warm ones, within an area', () => {
     const pool = [
       candidate('plain', 'work', { createdAt: 1 }),
-      candidate('priority', 'work', { createdAt: 2, priority: true }),
-      candidate('both', 'work', { createdAt: 3, priority: true, friction: true }),
+      candidate('some', 'work', { createdAt: 2, friction: 2 }),
+      candidate('hard', 'work', { createdAt: 3, friction: 4 }),
     ];
-    expect(ids(suggest(pool, state, config, 3))).toEqual(['both', 'priority', 'plain']);
+    expect(ids(suggest(pool, state, config, 3))).toEqual(['hard', 'some', 'plain']);
 
-    // First in its area, a fully warm routine doubles (40) where both tags add 75% (35).
+    // First in its area, a fully warm routine doubles (40) where four stars add 80% (36).
     const routine = candidate('routine', 'work', { createdAt: 4, warmth: 1 });
-    expect(ids(suggest([...pool, routine], state, config, 2))).toEqual(['routine', 'both']);
+    expect(ids(suggest([...pool, routine], state, config, 2))).toEqual(['routine', 'hard']);
   });
 
   it('puts an item with a home ahead of an unfiled one', () => {

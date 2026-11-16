@@ -18,12 +18,10 @@ export interface HeatConfig {
   /** Each further completion in the same area that day is worth this share of the one before. */
   repeatDecay: number;
   /**
-   * Extra share of an item's own reward for the Priority tag: what matters most right now.
-   * 0.2 means 20% more. It adds to Friction's share; the two never multiply.
+   * Extra share of an item's own reward for each star of Friction: how hard it is to start,
+   * not necessarily to do. 0.1 means 10% more a star, so five stars add 50%.
    */
-  priorityBonus: number;
-  /** The same for the Friction tag: hard to start, not necessarily hard to do. */
-  frictionBonus: number;
+  frictionStep: number;
   /** Added to an item's multiplier for a routine at full warmth. */
   warmthBonus: number;
   /** Share of the gap to full warmth closed by completing a routine on a scheduled day. */
@@ -45,8 +43,7 @@ export const DEFAULT_CONFIG: HeatConfig = {
   firstInAreaBonus: 0.5,
   areaBonusDecay: 0.7,
   repeatDecay: 0.8,
-  priorityBonus: 0.2,
-  frictionBonus: 0.3,
+  frictionStep: 0.1,
   warmthBonus: 1,
   warmthStep: 0.25,
   missStep: 0.2,
@@ -61,6 +58,9 @@ export const FULL_HEAT = 100;
 
 /** The ceiling gains approach but never reach. Surge is the stretch between FULL_HEAT and here. */
 export const MAX_HEAT = 120;
+
+/** The most stars of Friction an item can have. Part of the scale, not a tunable. */
+export const FRICTION_STARS = 5;
 
 /**
  * How many days before its date a monthly routine can be done, once the previous one is done,

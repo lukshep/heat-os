@@ -1,10 +1,11 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ItemPatch } from '../data/reducer';
 import type { ListItem, Place } from '../data/selectors';
+import { FRICTION_STARS } from '../heat/config';
 import { addDays, isDayKey, type DayKey } from '../heat/day';
-import { LAST_DAY, type Schedule } from '../heat/schedule';
+import { DAILY, isDaily, LAST_DAY, type Schedule } from '../heat/schedule';
 import { dayName, describeWhen } from './dates';
-import { CheckIcon } from './icons';
+import { CheckIcon, StarIcon } from './icons';
 import { heatColor } from './temperature';
 import { describeSchedule, monthDayName, weekdayName, weekdayOrder } from './weekdays';
 
@@ -60,12 +61,12 @@ export function ItemRow(props: Props) {
     window.setTimeout(props.onComplete, LEAVE_MS);
   }
 
-  const meta = [
+  // Priority shows as a bold title, so only a screen reader needs the word.
+  const meta: ReactNode[] = [
     context,
     item.repeat && describeSchedule(item.repeat),
     describeWhen(item.date, item.time, props.today, props.listDay),
-    item.priority && 'Priority',
-    item.friction && 'Friction',
+    item.friction > 0 && <Stars stars={item.friction} />,
   ].filter(Boolean);
 
   const waiting = !done && props.waiting === true;
@@ -75,6 +76,7 @@ export function ItemRow(props: Props) {
     leaving && 'is-leaving',
     done && 'is-done',
     waiting && 'is-waiting',
+    item.priority && 'is-priority',
   ]
     .filter(Boolean)
     .join(' ');
@@ -94,14 +96,35 @@ export function ItemRow(props: Props) {
             <span className="row-check-ring">{done && <CheckIcon />}</span>
           </button>
           <button className="row-title" type="button" aria-expanded={open} onClick={props.onToggle}>
-            <span className="row-title-text">{item.title}</span>
-            {meta.length > 0 && <span className="row-meta">{meta.join(' · ')}</span>}
+            <span className="row-title-text">
+              {item.priority && <span className="visually-hidden">Priority: </span>}
+              {item.title}
+            </span>
+            {meta.length > 0 && (
+              <span className="row-meta">
+                {meta.map((part, index) => (
+                  <Fragment key={index}>
+                    {index > 0 && ' · '}
+                    {part}
+                  </Fragment>
+                ))}
+              </span>
+            )}
           </button>
           {props.trailing}
         </div>
         {open && <Editor {...props} />}
       </div>
     </li>
+  );
+}
+
+/** A row's stars of Friction, filled ones only. A screen reader hears how many of how many. */
+function Stars({ stars }: { stars: number }) {
+  return (
+    <span className="row-stars" role="img" aria-label={`Friction, ${stars} of ${FRICTION_STARS} stars`}>
+      {'\u2605'.repeat(stars)}
+    </span>
   );
 }
 
@@ -119,6 +142,15 @@ const INBOX = 'inbox';
  */
 const MONTH_DAYS = Array.from({ length: LAST_DAY - 1 }, (_, index) => index + 1);
 
+/** Which repeat picker is showing: Daily has no days to choose, so it is a picker of its own. */
+type Repeat = 'day' | Schedule['every'];
+
+/** The picker that shows how an item repeats now. A one-off task starts on Weekly, one tap from a routine. */
+function repeatOf(schedule: Schedule | null): Repeat {
+  if (schedule === null) return 'week';
+  return isDaily(schedule) ? 'day' : schedule.every;
+}
+
 /** The value of the "Keep it in" picker that stands for where the item is now. */
 function homeKey(item: ListItem): string {
   if (item.areaId === null) return INBOX;
@@ -127,8 +159,8 @@ function homeKey(item: ListItem): string {
 
 function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Props) {
   const [title, setTitle] = useState(item.title);
-  // Which picker is showing. Switching it changes nothing until a day is chosen in it.
-  const [every, setEvery] = useState<Schedule['every']>(item.repeat?.every ?? 'week');
+  // Which picker is showing. Daily applies at once; Weekly and Monthly change nothing until a day is chosen.
+  const [every, setEvery] = useState<Repeat>(() => repeatOf(item.repeat));
   const chosen = item.repeat?.every === every ? item.repeat.days : [];
 
   function commitTitle() {
@@ -138,9 +170,21 @@ function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Prop
   }
 
   /** The first day chosen makes it a routine, and clearing the last makes it a one-off task. */
-  function toggleDay(day: number) {
+  function toggleDay(every: Schedule['every'], day: number) {
     const days = chosen.includes(day) ? chosen.filter((other) => other !== day) : [...chosen, day];
     onSetSchedule({ every, days });
+  }
+
+  function repeatDaily() {
+    setEvery('day');
+    if (item.repeat === null || !isDaily(item.repeat)) onSetSchedule(DAILY);
+  }
+
+  /** Makes it a one-off task again, without unticking each of its days. */
+  function stopRepeating() {
+    if (item.repeat === null) return;
+    setEvery('week');
+    onSetSchedule({ every: item.repeat.every, days: [] });
   }
 
   return (
@@ -162,13 +206,11 @@ function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Prop
         />
       </form>
 
-      <div className="chips" role="group" aria-label="Tags">
+      <div className="tags">
         <Chip pressed={item.priority} onClick={() => onUpdate({ priority: !item.priority })}>
           Priority
         </Chip>
-        <Chip pressed={item.friction} onClick={() => onUpdate({ friction: !item.friction })}>
-          Friction
-        </Chip>
+        <FrictionPicker stars={item.friction} onChange={(friction) => onUpdate({ friction })} />
       </div>
 
       <When item={item} today={today} onUpdate={onUpdate} />
@@ -200,6 +242,9 @@ function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Prop
         ) : (
           <div className="repeat">
             <div className="chips" role="group" aria-label="How often">
+              <Chip pressed={every === 'day'} onClick={repeatDaily}>
+                Daily
+              </Chip>
               <Chip pressed={every === 'week'} onClick={() => setEvery('week')}>
                 Weekly
               </Chip>
@@ -207,30 +252,36 @@ function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Prop
                 Monthly
               </Chip>
             </div>
-            {every === 'week' ? (
+            {every === 'week' && (
               <div className="chips" role="group" aria-label="Repeat on weekdays">
                 {weekdayOrder().map((day) => (
-                  <Chip key={day} pressed={chosen.includes(day)} onClick={() => toggleDay(day)}>
+                  <Chip key={day} pressed={chosen.includes(day)} onClick={() => toggleDay('week', day)}>
                     {weekdayName(day)}
                   </Chip>
                 ))}
               </div>
-            ) : (
+            )}
+            {every === 'month' && (
               <div className="month-days" role="group" aria-label="Repeat on days of the month">
                 {MONTH_DAYS.map((day) => (
                   <Chip
                     key={day}
                     pressed={chosen.includes(day)}
-                    onClick={() => toggleDay(day)}
+                    onClick={() => toggleDay('month', day)}
                     label={monthDayName(day)}
                   >
                     {day}
                   </Chip>
                 ))}
-                <Chip pressed={chosen.includes(LAST_DAY)} onClick={() => toggleDay(LAST_DAY)} wide>
+                <Chip pressed={chosen.includes(LAST_DAY)} onClick={() => toggleDay('month', LAST_DAY)} wide>
                   {monthDayName(LAST_DAY)}
                 </Chip>
               </div>
+            )}
+            {item.repeat !== null && (
+              <button className="text-button" type="button" onClick={stopRepeating}>
+                Stop repeating
+              </button>
             )}
           </div>
         )}
@@ -239,6 +290,35 @@ function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Prop
       <button className="text-button is-danger" type="button" onClick={onDelete}>
         Delete {item.kind}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Up to five stars for how hard an item is to start. Tapping a star sets that many, and tapping
+ * the last lit star again clears them all.
+ */
+function FrictionPicker({ stars, onChange }: { stars: number; onChange: (stars: number) => void }) {
+  return (
+    <div className="friction" role="group" aria-label="Friction">
+      <span className="friction-name" aria-hidden="true">
+        Friction
+      </span>
+      {Array.from({ length: FRICTION_STARS }, (_, index) => {
+        const value = index + 1;
+        return (
+          <button
+            key={value}
+            className="friction-star"
+            type="button"
+            aria-pressed={value <= stars}
+            aria-label={value === 1 ? '1 star' : `${value} stars`}
+            onClick={() => onChange(value === stars ? 0 : value)}
+          >
+            <StarIcon />
+          </button>
+        );
+      })}
     </div>
   );
 }

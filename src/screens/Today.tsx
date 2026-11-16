@@ -18,8 +18,9 @@ interface Props {
 }
 
 /**
- * How many tasks Today lists at once. Tasks planned for today take the places first and
- * suggestions fill the rest. Finishing or swapping a suggestion brings in the next.
+ * How many tasks Today lists at once. Tasks planned for today and Priority tasks with no date
+ * take the places first, and suggestions fill the rest. Finishing or swapping a suggestion
+ * brings in the next.
  */
 const SUGGESTION_COUNT = 5;
 
@@ -45,8 +46,8 @@ export function Today({ view, onComplete, day, onPickDay }: Props) {
 function TodayList({ view, onComplete }: Pick<Props, 'view' | 'onComplete'>) {
   const actions = useActions();
 
-  // What is settled for today comes first: anything with a time, then routines that are due,
-  // then tasks planned for today or before. None of it can be swapped away.
+  // What is settled for today comes first: Priority, then anything with a time, then routines
+  // that are due, then tasks planned for today or before. None of it can be swapped away.
   const plan = planToday(view.items, view.today, view.config.dayStartHour);
 
   const setAside = deferredToday(view.state, view.today);

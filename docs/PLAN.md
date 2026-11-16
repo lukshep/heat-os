@@ -26,12 +26,14 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M15 | Dates and times on tasks | Deployed 2026-11-15; not yet tried on an iPhone |
 | M16 | Calendar in Today | Deployed 2026-11-15; not yet tried on an iPhone |
 | M17 | Areas | Deployed 2026-11-15; not yet tried on an iPhone |
+| M18 | Daily, an anticlockwise line and a project icon | Built 2026-11-15; not yet deployed |
+| M19 | Priority first, Friction in stars, saved format version 7 | Built 2026-11-15; not yet deployed |
 
 The first prototype is M1–M3.
 
 M9 changed the product: there is no longer a line to reach. Sections M1 to M8 below describe what was built at the time, so they still mention the line, the threshold and its mark. M9 says what replaced them, and `docs/SPEC.md` describes the app as it is now.
 
-M11 renamed the tags. Sections M1 to M10 call Priority and Friction by their old names, Important and Avoided, and describe the flat bonus they used to add.
+M11 renamed the tags. Sections M1 to M10 call Priority and Friction by their old names, Important and Avoided, and describe the flat bonus they used to add. M19 changed them again: Priority stopped adding to a reward, and Friction became stars.
 
 ### M0 — Scaffold
 
@@ -440,6 +442,29 @@ Seen on an iPhone after M17: on a fresh launch, and sometimes after the keyboard
 
 Verified in a desktop browser on a production build: the frame unchanged outside an installed app and the standalone rule present in the built stylesheet; with a field used and the frame kept full height, nothing done; with the frame shortened while a field was in use, one refit, the list's scroll and the open area kept; and focus moving straight to another field left alone. The focus events were sent by hand, because the hidden pane gets none. The real faults happen only on an iPhone, so whether this cures them is not yet known.
 
+### M18 — Daily, an anticlockwise line and a project icon
+
+No change to saved data or scoring.
+
+- **Daily** joins Weekly and Monthly at the head of Repeat. It applies at once, with no days to pick, and is saved as the weekly schedule on all seven days (`DAILY` in `src/heat/schedule.ts`), so routines already set to every day open on Daily. Their rows read "Daily" instead of "Every day". Weekly still shows all seven lit, so one can be dropped.
+- **Stop repeating**, a text button under Repeat whenever an item repeats, makes it a one-off task again without unticking each day. A Daily routine has no days to untick, so it needs it.
+- **The edge line runs anticlockwise**: from the top centre down the left side, so halfway is still the bottom centre. The flare and the Surge shimmer follow the path, so they turn with it.
+- **The tip is the end of the line.** The white dot, wider than the line, is gone. The line's last stretch is lightened in two steps instead, a longer stretch a little and a short one at its very end most, at the line's own width and with the line's own glow.
+- **New project** on an area page is a folder with a plus, named "New project in Work" for a screen reader, so it does not look like the plain plus that adds a task to a project.
+
+Verified on a production build at phone size, with made-up data: the line's path starting leftwards from the top centre; the tip's two stretches drawn at the line's own 4-point width with its glow; a routine on every day opening on Daily, with no day picker; Stop repeating making it a task, Daily making it a routine again, and Weekly then showing all seven days lit; the folder icon at 44 points, opening "New project in Body". Not tried on an iPhone.
+
+### M19 — Priority first, Friction in stars
+
+- **Priority earns nothing.** `priorityFirst` (`src/data/selectors.ts`) moves Priority items to the top of a list and keeps the order on each side. `ItemList` applies it, so it holds on every screen; Today and a later day apply it too, above timed items. A Priority title is bold, and the word leaves the row's details, though a screen reader still hears it. Its ring is that of the same item without it.
+- **An undated Priority task is always on Today**, settled like a planned one: it takes one of the five task places first and cannot be swapped away. A Priority task planned for a later day waits for its day.
+- **Friction is 0 to 5 stars** (`FRICTION_STARS`), each adding `frictionStep`, 10%, of the item's own reward. Five stars equal the old Priority and Friction together, so the hottest ring, the expected-behaviour table and the scenario invariants are unchanged.
+- **In the editor**, a Priority chip and five stars labelled Friction share a line where there is room. Tapping a star sets that many and tapping the last lit one clears them. **On a row**, filled stars follow its other details in grey; none shows nothing.
+
+Saved data: version 7. Tasks and routines with Friction get three stars, which earn what the tag did, and keep Priority. Completions lose Priority and carry stars that earn exactly what their tags earned: three for Friction, two for Priority, five for both. Past HEAT does not move. The step is tested against a version 6 document.
+
+Verified on a production build at phone size, with a made-up version 6 document given both tags here and there: it loaded and was saved as version 7, with completions at two, three and five stars and none carrying Priority, and tasks with Friction at three stars. Today listed the Priority items first and bold (a task planned for an earlier day, then an undated one with no swap button), then the timed task, the routines, the planned task and one suggestion. Clearing, setting and showing stars on a row; marking a routine Priority moving it to the top; Priority first on an area page. No console errors. Not tried on an iPhone.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications, reordering areas.
@@ -476,7 +501,7 @@ Cloud sync, routine pause, notifications, reordering areas.
 | 26 | Effort and Cooling apply from the moment they change; HEAT already earned is never rescored | Decided 2026-11-12 |
 | 27 | Cooling changes only how fast HEAT fades, so it also moves where the same days sit | Decided 2026-11-12, chosen over holding the band fixed |
 | 28 | HEAT can be reset by hand from Settings, after a confirmation. The completion log is kept | Decided 2026-11-12 |
-| 29 | Priority adds 20% of a task's reward, Friction 30%, both 50%. The shares add, never multiply | Decided 2026-11-12 |
+| 29 | Priority adds 20% of a task's reward, Friction 30%, both 50%. The shares add, never multiply | Replaced by 45 and 47 |
 | 30 | Important is renamed Priority and Avoided is renamed Friction, in the app, the code and the saved data | Decided 2026-11-12 |
 | 31 | A ring's colour shows the points the item would earn now, on a fixed scale topped by the most any item can earn. HEAT plays no part | Decided 2026-11-13 |
 | 32 | A task's date is a planned day, not a deadline. Once it has passed, the task waits on Today; nothing is ever overdue | Decided 2026-11-15 |
@@ -490,6 +515,13 @@ Cloud sync, routine pause, notifications, reordering areas.
 | 40 | The Projects tab becomes Areas: an overview with no counts or colour, opening into one page per area that swipes to the next | Decided 2026-11-15 |
 | 41 | Routines stay where they are filed, first in their section | Decided 2026-11-15 |
 | 42 | A row's check takes back only a completion made today | Decided 2026-11-15 |
+| 43 | Repeat offers Daily, saved as a weekly schedule on all seven days. "Stop repeating" turns any routine back into a task | Decided 2026-11-15 |
+| 44 | The edge line grows anticlockwise from the top centre, and its tip is a brighter stretch of the line, no wider than it | Decided 2026-11-15 |
+| 45 | Priority earns nothing. It puts an item first in every list, above timed items too, and makes its title bold | Decided 2026-11-15 |
+| 46 | An undated Priority task is always on Today, like a planned one, and cannot be swapped away | Decided 2026-11-15 |
+| 47 | Friction is 0 to 5 stars, each adding 10% of the item's reward. Friction from before is three stars | Decided 2026-11-15 |
+| 48 | Past HEAT is kept when the tags change: old completions carry stars that earn what their tags earned | Decided 2026-11-15 |
+| 49 | New project on an area page is a folder-with-plus icon, not a text button | Decided 2026-11-15 |
 
 ## Tuning log
 
@@ -512,3 +544,4 @@ Record every change to `DEFAULT_CONFIG` here: date, what changed, why, and which
 | 2026-11-12 | Warmth now multiplies only the area part of a routine's points, not its flags | Follows from flags being flat |
 | 2026-11-12 | New: Effort steps scale the gain scale by 0.75, 1 and 1.3. Cooling steps shift daily retention by +0.05, 0 and -0.05; Surge retention never drops below the daily rate. `DEFAULT_CONFIG` unchanged | Personal settings (M10). The Effort steps put a light day (Easier) and a heavy day (Harder) where a balanced day sits on Standard. Shifting Surge retention too made Surge permanent for a huge day on Slower |
 | 2026-11-12 | Tags: `importantBonus` and `avoidedBonus` (0.75 each, flat, as a share of a plain task) become `priorityBonus` 0.2 and `frictionBonus` 0.3, as a share of the item's own reward. They add, and multiply the area factor and warmth | Asked for (M11). A balanced day with its first task tagged with both goes from 100 points (peak 90) to 92 (peak 87); a huge day from 194 (peak 107, 43% in Surge) to 175 (peak 104, 27%); tagging everything from 205 (peak 108, 47%) to 127 (peak 96, none) |
+| 2026-11-15 | `priorityBonus` 0.2 and `frictionBonus` 0.3 become `frictionStep` 0.1 a star, up to five (`FRICTION_STARS`). Priority adds nothing | Asked for (M19). Five stars equal the old pair, so every scenario and the hottest ring are unchanged. Friction from before is three stars and earns what it did |

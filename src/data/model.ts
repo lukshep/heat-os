@@ -42,8 +42,10 @@ export interface Task extends Meta {
   /** Both null means the task is in the Inbox. */
   areaId: ID | null;
   projectId: ID | null;
+  /** Put first in every list it is in, and on Today when it has no date. It earns nothing extra. */
   priority: boolean;
-  friction: boolean;
+  /** Stars of Friction, 0 to FRICTION_STARS: how hard it is to start. Each one adds to its reward. */
+  friction: number;
   /**
    * The day it is planned for, or null. A planned day, not a deadline: once it has passed, the
    * task simply waits on Today until it is done or given another day.
@@ -58,7 +60,7 @@ export interface Routine extends Meta {
   areaId: ID;
   projectId: ID | null;
   priority: boolean;
-  friction: boolean;
+  friction: number;
   /** A time of day it is done at, or null. */
   time: ClockTime | null;
   schedule: Schedule;
@@ -76,8 +78,11 @@ export interface Completion extends Meta {
   itemId: ID;
   kind: 'task' | 'routine';
   areaId: ID | null;
-  priority: boolean;
-  friction: boolean;
+  /**
+   * Stars of Friction when completed. A completion from before version 7 carries the stars that
+   * earn what its old tags earned: three for Friction, two for Priority, five for both.
+   */
+  friction: number;
   /** Routine warmth when completed; 0 for tasks. */
   warmth: number;
   /**
@@ -164,9 +169,10 @@ export interface AppState {
  * changes, and the time HEAT was last reset. Version 5 renamed the tags on tasks, routines
  * and completions: `important` became `priority` and `avoided` became `friction`. Version 6
  * gave tasks a date and a time and routines a time, made schedules weekly or monthly, and
- * replaced a completion's `scheduled` with the date it counted for.
+ * replaced a completion's `scheduled` with the date it counted for. Version 7 made Friction a
+ * number of stars, and took Priority off completions, since it no longer changes a reward.
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const SEED_AREA_NAMES = ['Work', 'Health', 'Home', 'People', 'Growth'];
 

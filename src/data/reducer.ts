@@ -1,4 +1,4 @@
-import type { Tuning } from '../heat/config';
+import { FRICTION_STARS, type Tuning } from '../heat/config';
 import { isDayKey, type DayKey } from '../heat/day';
 import { LAST_DAY, type Schedule } from '../heat/schedule';
 import type { WarmthBase } from '../heat/warmth';
@@ -152,9 +152,14 @@ function patched<T extends Task | Routine>(record: T, patch: ItemPatch, at: numb
   const next = { ...record, updatedAt: at };
   if (patch.title !== undefined && patch.title.trim()) next.title = patch.title.trim();
   if (patch.priority !== undefined) next.priority = patch.priority;
-  if (patch.friction !== undefined) next.friction = patch.friction;
+  if (patch.friction !== undefined && Number.isFinite(patch.friction)) next.friction = cleanStars(patch.friction);
   if (patch.time === null || isClockTime(patch.time)) next.time = patch.time;
   return next;
+}
+
+/** A whole number of stars from none to the most there can be. */
+function cleanStars(stars: number): number {
+  return Math.min(FRICTION_STARS, Math.max(0, Math.round(stars)));
 }
 
 /** Retires a routine and leaves a one-off task with the same id in `areaId`. */
@@ -194,7 +199,7 @@ export function reduce(state: AppState, action: Action): AppState {
         title,
         ...home,
         priority: false,
-        friction: false,
+        friction: 0,
         date: dayOrNull(action.date),
         time: null,
       };
@@ -235,7 +240,6 @@ export function reduce(state: AppState, action: Action): AppState {
         itemId: task.id,
         kind: 'task',
         areaId: task.areaId,
-        priority: task.priority,
         friction: task.friction,
         warmth: 0,
         occurrence: null,
@@ -329,7 +333,6 @@ export function reduce(state: AppState, action: Action): AppState {
         itemId: routine.id,
         kind: 'routine',
         areaId: routine.areaId,
-        priority: routine.priority,
         friction: routine.friction,
         warmth: Math.min(1, Math.max(0, action.warmth)),
         occurrence,

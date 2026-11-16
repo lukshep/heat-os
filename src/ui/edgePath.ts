@@ -1,6 +1,7 @@
 /**
  * The path the edge meter runs along: a rounded rectangle just inside the screen, starting
- * at the top centre and going clockwise. Halfway round is the bottom centre.
+ * at the top centre and going anticlockwise, down the left side first. Halfway round is the
+ * bottom centre.
  */
 export interface EdgeShape {
   width: number;
@@ -21,16 +22,17 @@ export function edgePath(shape: EdgeShape): string {
   const right = shape.width - shape.inset;
   const bottom = shape.height - shape.inset;
   const centre = shape.width / 2;
+  // Sweep flag 0: each corner turns anticlockwise on screen.
   return [
     `M${centre},${top}`,
-    `H${right - r}`,
-    `A${r},${r} 0 0 1 ${right},${top + r}`,
-    `V${bottom - r}`,
-    `A${r},${r} 0 0 1 ${right - r},${bottom}`,
     `H${left + r}`,
-    `A${r},${r} 0 0 1 ${left},${bottom - r}`,
+    `A${r},${r} 0 0 0 ${left},${top + r}`,
+    `V${bottom - r}`,
+    `A${r},${r} 0 0 0 ${left + r},${bottom}`,
+    `H${right - r}`,
+    `A${r},${r} 0 0 0 ${right},${bottom - r}`,
     `V${top + r}`,
-    `A${r},${r} 0 0 1 ${left + r},${top}`,
+    `A${r},${r} 0 0 0 ${right - r},${top}`,
     `H${centre}`,
   ].join(' ');
 }

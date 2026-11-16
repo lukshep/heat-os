@@ -1,12 +1,12 @@
-import { FULL_HEAT, MAX_HEAT, type HeatConfig } from './config';
+import { FRICTION_STARS, FULL_HEAT, MAX_HEAT, type HeatConfig } from './config';
 import { DAY_MS, type DayKey } from './day';
 
 /** What scoring needs to know about something that could be completed. */
 export interface Scorable {
   /** null for an item with no area (the Inbox). */
   areaId: string | null;
-  priority: boolean;
-  friction: boolean;
+  /** Stars of Friction, 0 to FRICTION_STARS. */
+  friction: number;
   /** Routine warmth from 0 to 1; 0 for tasks. */
   warmth: number;
 }
@@ -140,17 +140,18 @@ export function warmthFactor(item: Scorable, config: HeatConfig): number {
 }
 
 /**
- * Multiplier from the Priority and Friction tags. Their bonuses add rather than multiply,
- * so an item with both earns 1 + priority + friction times its untagged reward.
+ * Multiplier from Friction: each star adds the same share of the item's own reward, so an item
+ * with three stars earns 1 + 3 * frictionStep times its reward with none.
  */
-export function tagFactor(item: Scorable, config: HeatConfig): number {
-  return 1 + (item.priority ? config.priorityBonus : 0) + (item.friction ? config.frictionBonus : 0);
+export function frictionFactor(item: Scorable, config: HeatConfig): number {
+  const stars = Math.min(FRICTION_STARS, Math.max(0, Math.round(item.friction)));
+  return 1 + config.frictionStep * stars;
 }
 
 /** What a completion is worth before HEAT resistance. */
 export function pointsFor(item: Scorable, position: DayPosition, config: HeatConfig): number {
-  const untagged = config.basePoints * areaFactor(item.areaId, position, config) * warmthFactor(item, config);
-  return untagged * tagFactor(item, config);
+  const plain = config.basePoints * areaFactor(item.areaId, position, config) * warmthFactor(item, config);
+  return plain * frictionFactor(item, config);
 }
 
 /**

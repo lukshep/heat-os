@@ -12,6 +12,14 @@ export type Schedule =
   | { every: 'week'; days: readonly number[] }
   | { every: 'month'; days: readonly number[] };
 
+/** Daily is a weekly schedule on all seven days, so it needs no rules of its own. */
+export const DAILY: Schedule = { every: 'week', days: [0, 1, 2, 3, 4, 5, 6] };
+
+/** True for a schedule due every day. */
+export function isDaily(schedule: Schedule): boolean {
+  return schedule.every === 'week' && DAILY.days.every((day) => schedule.days.includes(day));
+}
+
 /**
  * The longest a valid schedule can go between two dates. A monthly one is due at least once
  * in every month, so no two of its dates are further apart than two months.

@@ -83,22 +83,36 @@ describe('tasks', () => {
     expect(openTasks(state).map((task) => task.id)).toEqual(['old', 'new']);
   });
 
-  it('renames, tags and moves a task', () => {
+  it('renames, tags and moves a task, and gives it stars of Friction', () => {
     const start = fresh();
     const home = areaId(start, 'Home');
     const state = run(start, addTask('t1', 'Fix tap'), {
       type: 'task/update',
       id: 't1',
       at: 2500,
-      patch: { title: ' Fix the tap ', priority: true, friction: true, areaId: home },
+      patch: { title: ' Fix the tap ', priority: true, friction: 3, areaId: home },
     });
     expect(state.tasks.t1).toMatchObject({
       title: 'Fix the tap',
       priority: true,
-      friction: true,
+      friction: 3,
       areaId: home,
       updatedAt: 2500,
     });
+  });
+
+  it('keeps Friction to whole stars from none to five', () => {
+    const update = (at: number, friction: number): Action => ({
+      type: 'task/update',
+      id: 't1',
+      at,
+      patch: { friction },
+    });
+    const start = run(fresh(), addTask('t1', 'Taxes'));
+    expect(run(start, update(2500, 9)).tasks.t1?.friction).toBe(5);
+    expect(run(start, update(2500, -1)).tasks.t1?.friction).toBe(0);
+    expect(run(start, update(2500, 2.6)).tasks.t1?.friction).toBe(3);
+    expect(run(start, update(2500, 2), update(2600, Number.NaN)).tasks.t1?.friction).toBe(2);
   });
 
   it('keeps the old title when the new one is blank, and the old area when the new one is unknown', () => {
@@ -182,7 +196,7 @@ describe('completing', () => {
     const state = run(
       start,
       addTask('t1', 'Run', health),
-      { type: 'task/update', id: 't1', at: 2500, patch: { priority: true } },
+      { type: 'task/update', id: 't1', at: 2500, patch: { priority: true, friction: 4 } },
       complete('c1', 't1'),
     );
     expect(openTasks(state)).toEqual([]);
@@ -194,12 +208,13 @@ describe('completing', () => {
         itemId: 't1',
         kind: 'task',
         areaId: health,
-        priority: true,
-        friction: false,
+        friction: 4,
         warmth: 0,
         occurrence: null,
       }),
     ]);
+    // Priority orders lists; it is not part of what a completion earned.
+    expect(liveCompletions(state)[0]).not.toHaveProperty('priority');
   });
 
   it('counts a task once however many times it is completed', () => {
@@ -226,11 +241,11 @@ describe('completing', () => {
       start,
       addTask('t1', 'Report', work),
       complete('c1', 't1'),
-      { type: 'task/update', id: 't1', at: 4000, patch: { areaId: home, priority: true } },
+      { type: 'task/update', id: 't1', at: 4000, patch: { areaId: home, friction: 5 } },
       { type: 'task/delete', id: 't1', at: 4500 },
       { type: 'area/delete', id: work, at: 5000 },
     );
-    expect(liveCompletions(state)).toEqual([expect.objectContaining({ areaId: work, priority: false })]);
+    expect(liveCompletions(state)).toEqual([expect.objectContaining({ areaId: work, friction: 0 })]);
   });
 
   it('can be undone, and the task can then be completed again', () => {

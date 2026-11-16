@@ -1,4 +1,4 @@
-import { COOLINGS, EFFORTS } from '../heat/config';
+import { COOLINGS, EFFORTS, FRICTION_STARS } from '../heat/config';
 import { isDayKey } from '../heat/day';
 import {
   DEFAULT_SETTINGS,
@@ -72,6 +72,8 @@ const isStringOrNull = (value: unknown) => value === null || isString(value);
 const isNumberOrNull = (value: unknown) => value === null || isNumber(value);
 const isDayKeyOrNull = (value: unknown) => value === null || isDayKey(value);
 const isClockTimeOrNull = (value: unknown) => value === null || isClockTime(value);
+const isStars = (value: unknown) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= FRICTION_STARS;
 const isSchedule = (value: unknown) =>
   isDict(value) &&
   (value.every === 'week' || value.every === 'month') &&
@@ -96,7 +98,7 @@ const SHAPES: Record<string, Record<string, Check>> = {
     areaId: isStringOrNull,
     projectId: isStringOrNull,
     priority: isBoolean,
-    friction: isBoolean,
+    friction: isStars,
     date: isDayKeyOrNull,
     time: isClockTimeOrNull,
   },
@@ -106,7 +108,7 @@ const SHAPES: Record<string, Record<string, Check>> = {
     areaId: isString,
     projectId: isStringOrNull,
     priority: isBoolean,
-    friction: isBoolean,
+    friction: isStars,
     time: isClockTimeOrNull,
     schedule: isSchedule,
     warmthBase: (value) =>
@@ -119,8 +121,7 @@ const SHAPES: Record<string, Record<string, Check>> = {
     itemId: isString,
     kind: (value) => value === 'task' || value === 'routine',
     areaId: isStringOrNull,
-    priority: isBoolean,
-    friction: isBoolean,
+    friction: isStars,
     warmth: isNumber,
     occurrence: isDayKeyOrNull,
   },
@@ -195,7 +196,36 @@ function migrate(raw: Dict): Dict | null {
     };
   }
 
+  // Version 7 made Friction a number of stars, worth 10% of a reward each, and Priority stopped
+  // adding to a reward. Friction was worth 30% and Priority 20%, so a completion keeps exactly
+  // what it earned as three stars for Friction and two for Priority. A task or routine with
+  // Friction gets three stars, which earn what it earns now; Priority stays on it, for ordering.
+  if (document.schemaVersion === 6) {
+    document = {
+      ...document,
+      schemaVersion: 7,
+      tasks: eachRecord(document.tasks, ({ friction, ...rest }) => ({ ...rest, friction: starsFor(friction, false) })),
+      routines: eachRecord(document.routines, ({ friction, ...rest }) => ({
+        ...rest,
+        friction: starsFor(friction, false),
+      })),
+      completions: eachRecord(document.completions, ({ priority, friction, ...rest }) => ({
+        ...rest,
+        friction: starsFor(friction, priority),
+      })),
+    };
+  }
+
   return document.schemaVersion === SCHEMA_VERSION ? document : null;
+}
+
+const FRICTION_TAG_STARS = 3;
+const PRIORITY_TAG_STARS = 2;
+
+/** The stars that earn what version 6's tags earned. A damaged tag gives no stars, so the document is still refused. */
+function starsFor(friction: unknown, priority: unknown): number | null {
+  if (typeof friction !== 'boolean' || typeof priority !== 'boolean') return null;
+  return (friction ? FRICTION_TAG_STARS : 0) + (priority ? PRIORITY_TAG_STARS : 0);
 }
 
 /**

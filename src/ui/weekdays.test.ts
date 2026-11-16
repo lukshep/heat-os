@@ -29,7 +29,6 @@ describe('weekdayName', () => {
 
 describe('describeDays', () => {
   it('uses a plain phrase for the common schedules', () => {
-    expect(describeDays([0, 1, 2, 3, 4, 5, 6])).toBe('Every day');
     expect(describeDays([1, 2, 3, 4, 5])).toBe('Weekdays');
     expect(describeDays([6, 0])).toBe('Weekends');
   });
@@ -68,6 +67,10 @@ describe('monthDayName', () => {
 });
 
 describe('describeSchedule', () => {
+  it('calls a schedule on all seven days Daily, as the picker does', () => {
+    expect(describeSchedule({ every: 'week', days: [0, 1, 2, 3, 4, 5, 6] })).toBe('Daily');
+  });
+
   it('describes a weekly schedule by its days', () => {
     expect(describeSchedule({ every: 'week', days: [1, 2, 3, 4, 5] })).toBe('Weekdays');
   });

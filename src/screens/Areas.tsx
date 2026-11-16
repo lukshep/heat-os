@@ -5,7 +5,7 @@ import type { View } from '../app/view';
 import type { ID } from '../data/model';
 import { itemsAt, type ListItem, type Place } from '../data/selectors';
 import { AddInput } from '../ui/AddInput';
-import { ChevronIcon, PlusIcon } from '../ui/icons';
+import { ChevronIcon, NewProjectIcon, PlusIcon } from '../ui/icons';
 import { ItemList } from './ItemList';
 
 interface Props {
@@ -187,8 +187,13 @@ function AreaPage({ area, view, onComplete, editing, onEditing, current, collaps
 
       <div className="area-add">
         <AddInput placeholder={`Add to ${area.name}`} onAdd={(title) => actions.addTask(title, area.id)} />
-        <button className="text-button" type="button" onClick={() => setStartingProject(true)}>
-          New project
+        <button
+          className="area-new-project"
+          type="button"
+          aria-label={`New project in ${area.name}`}
+          onClick={() => setStartingProject(true)}
+        >
+          <NewProjectIcon />
         </button>
       </div>
       {startingProject && (

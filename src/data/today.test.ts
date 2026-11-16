@@ -3,7 +3,16 @@ import type { Schedule } from '../heat/schedule';
 import { TEST_CONFIG } from '../heat/testConfig';
 import { createInitialState, type AppState } from './model';
 import { reduce, type Action } from './reducer';
-import { dayList, hasPlans, listItems, liveAreas, minutesIntoDay, planToday, type ListItem } from './selectors';
+import {
+  dayList,
+  hasPlans,
+  listItems,
+  liveAreas,
+  minutesIntoDay,
+  planToday,
+  priorityFirst,
+  type ListItem,
+} from './selectors';
 
 const TODAY = '2026-11-15';
 const DAY_START = 4;
@@ -19,7 +28,7 @@ function row(id: string, overrides: Partial<ListItem> = {}): ListItem {
     areaId: 'work',
     projectId: null,
     priority: false,
-    friction: false,
+    friction: 0,
     createdAt: ++created,
     date: null,
     time: null,
@@ -88,6 +97,38 @@ describe('planToday', () => {
     expect(plan.plannedTasks).toBe(2);
     expect(ids(plan.undated)).toEqual(['loose']);
   });
+
+  it('puts Priority first, timed items included, keeping the usual order on each side', () => {
+    const items = [
+      routine('meds', { time: '20:00' }),
+      routine('run', { priority: true }),
+      row('call', { date: TODAY, time: '09:30' }),
+      row('pay', { date: TODAY, priority: true }),
+      row('dentist', { date: TODAY, time: '11:00', priority: true }),
+    ];
+    expect(ids(planToday(items, TODAY, DAY_START).settled)).toEqual(['dentist', 'run', 'pay', 'call', 'meds']);
+  });
+
+  it('always has a Priority task with no date on it, rather than offering it as a suggestion', () => {
+    const items = [row('loose'), row('urgent', { priority: true }), row('pay', { date: TODAY })];
+    const plan = planToday(items, TODAY, DAY_START);
+    expect(ids(plan.settled)).toEqual(['urgent', 'pay']);
+    expect(plan.plannedTasks).toBe(2);
+    expect(ids(plan.undated)).toEqual(['loose']);
+  });
+
+  it('leaves a Priority task planned for a later day on its day', () => {
+    const plan = planToday([row('later', { date: '2026-11-16', priority: true })], TODAY, DAY_START);
+    expect(plan.settled).toEqual([]);
+    expect(plan.undated).toEqual([]);
+  });
+});
+
+describe('priorityFirst', () => {
+  it('moves Priority to the top and keeps the order on each side', () => {
+    const items = [row('a'), row('b', { priority: true }), row('c'), row('d', { priority: true })];
+    expect(ids(priorityFirst(items))).toEqual(['b', 'd', 'a', 'c']);
+  });
 });
 
 describe('a later day', () => {
@@ -135,6 +176,11 @@ describe('a later day', () => {
 
   it('holds the tasks planned for it and the routines due on it, timed first', () => {
     expect(ids(friday(week()))).toEqual(['call', 'rent', 'run', 'bins', 'pay']);
+  });
+
+  it('puts Priority first on a later day too', () => {
+    const state = reduce(week(), { type: 'task/update', id: 'pay', at: 9000, patch: { priority: true } });
+    expect(ids(friday(state))).toEqual(['pay', 'call', 'rent', 'run', 'bins']);
   });
 
   it('can be done ahead only where a monthly date has opened early', () => {

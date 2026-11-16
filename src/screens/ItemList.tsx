@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useActions } from '../app/store';
 import type { View } from '../app/view';
 import type { ID } from '../data/model';
-import { placeLabel, scorable, type ListItem } from '../data/selectors';
+import { placeLabel, priorityFirst, scorable, type ListItem } from '../data/selectors';
 import type { DayKey } from '../heat/day';
 import { pointsNow } from '../heat/engine';
 import { ItemRow } from '../ui/ItemRow';
@@ -23,7 +23,10 @@ interface Props {
   trailing?: ((item: ListItem) => ReactNode) | undefined;
 }
 
-/** A list of rows, each coloured by the points it would earn right now. One row opens at a time. */
+/**
+ * A list of rows, each coloured by the points it would earn right now, Priority first. One row
+ * opens at a time.
+ */
 export function ItemList(props: Props) {
   const { items, view, onComplete, showPlace = false, routinesStay = false, listDay, canComplete, trailing } = props;
   const actions = useActions();
@@ -44,7 +47,7 @@ export function ItemList(props: Props) {
 
   return (
     <ul className="rows">
-      {items.map((item) => (
+      {priorityFirst(items).map((item) => (
         <ItemRow
           key={item.id}
           item={item}

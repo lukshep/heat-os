@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { DEFAULT_CONFIG, FULL_HEAT, MAX_HEAT, type HeatConfig } from '../heat/config';
+import { DEFAULT_CONFIG, FRICTION_STARS, FULL_HEAT, MAX_HEAT, type HeatConfig } from '../heat/config';
 import { SCENARIOS, simDayOf, simulate, type Scenario, type SimResult } from '../heat/sim';
 import { HeatChart } from './HeatChart';
 import './dev.css';
@@ -28,8 +28,8 @@ const SCENARIO_FIELDS: ScenarioField[] = [
   { key: 'daysOff', label: 'Days off', min: 0, max: 60 },
   { key: 'areas', label: 'Areas touched', min: 1, max: 12 },
   { key: 'tasks', label: 'Tasks a day', min: 0, max: 100 },
-  { key: 'priority', label: 'Priority', min: 0, max: 100 },
-  { key: 'friction', label: 'Friction', min: 0, max: 100 },
+  { key: 'starred', label: 'Tasks with Friction', min: 0, max: 100 },
+  { key: 'stars', label: 'Stars on each', min: 0, max: FRICTION_STARS },
   { key: 'routines', label: 'Daily routines', min: 0, max: 12 },
   { key: 'skipRoutinesEvery', label: 'Skip routines every', min: 0, max: 30 },
   { key: 'fromHour', label: 'From hour', min: 0, max: 23 },
@@ -84,20 +84,12 @@ const CONFIG_FIELDS: ConfigField[] = [
   { key: 'areaBonusDecay', label: 'Bonus kept per further area', min: 0, max: 1, step: 0.05 },
   { key: 'repeatDecay', label: 'Kept per further task in area', min: 0, max: 0.95, step: 0.05 },
   {
-    key: 'priorityBonus',
-    label: 'Priority, share of reward',
+    key: 'frictionStep',
+    label: 'Friction, share of reward a star',
     min: 0,
-    max: 2,
-    step: 0.05,
-    describe: (value) => `${Math.round(value * 100)}% more than untagged; adds to the other tag`,
-  },
-  {
-    key: 'frictionBonus',
-    label: 'Friction, share of reward',
-    min: 0,
-    max: 2,
-    step: 0.05,
-    describe: (value) => `${Math.round(value * 100)}% more than untagged; adds to the other tag`,
+    max: 0.5,
+    step: 0.01,
+    describe: (value) => `${Math.round(value * FRICTION_STARS * 100)}% more at ${FRICTION_STARS} stars`,
   },
   { key: 'warmthBonus', label: 'Full-warmth bonus', min: 0, max: 3, step: 0.1 },
   { key: 'warmthStep', label: 'Warmth gap closed per completion', min: 0.05, max: 1, step: 0.05 },

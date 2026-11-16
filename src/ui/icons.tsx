@@ -18,6 +18,25 @@ export function PlusIcon() {
   );
 }
 
+/** A folder with a plus: start a new project. Unlike the plain plus, which adds a task. */
+export function NewProjectIcon() {
+  return (
+    <svg {...base}>
+      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z" />
+      <path d="M12 11v6M9 14h6" />
+    </svg>
+  );
+}
+
+/** A star of Friction. CSS fills it when it is lit. */
+export function StarIcon() {
+  return (
+    <svg {...base}>
+      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+    </svg>
+  );
+}
+
 /** The tab bar's icons. They are a little larger and lighter than the rest, since they stand alone. */
 const tab = { ...base, width: 24, height: 24, strokeWidth: 1.8 } as const;
 
