@@ -22,7 +22,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M11 | Priority and Friction | Deployed 2026-11-12; not yet tried on an iPhone |
 | M12 | Rings show points, not HEAT | Built 2026-11-13; not yet deployed |
 | M13 | Due dates and saved format version 6 | Built 2026-11-15; not yet deployed |
-| M14 | Monthly routines | Planned |
+| M14 | Monthly routines | Built 2026-11-15; not yet deployed |
 | M15 | Dates and times on tasks | Planned |
 | M16 | Calendar in Today | Planned |
 | M17 | Areas | Planned |
@@ -366,6 +366,20 @@ The foundation for M14–M17, with no new screens.
 Saved data: the format is now version 6. Version 5 documents are upgraded with no dates or times, weekly schedules, and each completion's date taken from whether its day was scheduled. A routine whose last date was missed but is still open is not counted as missed yet, so its warmth is briefly a little higher than before. An off-day completion from before the upgrade does not count for the date it followed, so that routine can show as due again once.
 
 Verified: unit tests for month lengths, day keys, every schedule rule (short months, leap years, two days on one date, the open window, opening early), the new warmth rule and carry-over, the reducer's dates and times, and the version 5 upgrade, including warmth unchanged. The scenario invariants pass untouched. On a production build in a desktop browser at phone size, with made-up data: a version 5 document loading and being saved as version 6; a Friday routine missed on Friday showing on Sunday's Today, completed there for Friday and taken back from its check; a Saturday routine done the day before showing a check that cannot be pressed; and changing a routine's days keeping its warmth with no miss. Not verified on an iPhone.
+
+### M14 — Monthly routines
+
+The editor can now make a monthly routine. The rules came with M13.
+
+- **Repeat** starts with Weekly and Monthly. They only choose which picker shows, and open on the routine's own kind; switching changes nothing until a day is chosen in the other picker, which then replaces the schedule. The first day chosen makes the task a routine, and clearing the last makes it a one-off task again.
+- **The monthly picker** is the 1st to the 30th, six to a row so each stays a 44-point target at phone width, with Last day on a row of its own. The 31st is not offered: it would fall on the last day of every month, so it is the same as Last day. Each number is spoken as its ordinal ("15th").
+- **Rows name the pattern**: "Monthly · 1st, 15th", "Monthly · Last day". Ordinals are English, like the rest of the app's words; weekday names still follow the device's language.
+- **Opening early** needed nothing new on screen. A monthly routine open early has a live ring in its area and counts for its coming date, and Today lists it only from that date.
+- **Left for M15**: preselecting a dated task's day of the month when it is made monthly. No task can have a date until M15 adds the When row.
+
+Saved data: unchanged, still version 6.
+
+Verified: unit tests for ordinals, "Last day" and the monthly labels. On a production build in a desktop browser at phone size, with made-up data: a task made monthly on Last day, then on the 15th as well, then cleared back to a task, the editor staying open throughout; a routine on the 20th, five days away, completed early from its area, the completion counting for the 20th, and kept off Today; switching a monthly routine's picker to Weekly saving nothing; every day button at least 44 by 44 points at 375 wide. Not verified on an iPhone.
 
 ### Later, not planned in detail
 

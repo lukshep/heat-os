@@ -36,7 +36,7 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 - **There is no moving a single date.** Lateness is covered by the open window, and changing the days changes the routine from today on, keeping the warmth earned. A date still open when the days change counts if it was done and is dropped without a miss if not.
 - **Only a completion made today can be taken back from the row.** An older one would change HEAT on an earlier day. The Undo toast is unchanged.
 
-The editor offers weekdays only until M14 adds the monthly picker; the rules above already hold for both.
+In the editor, **Repeat** starts with Weekly or Monthly, which only chooses the picker below it: the weekday chips, or a grid of the 1st to the 30th with Last day on a row of its own. The first day chosen makes the task a routine and clearing the last makes it a one-off task again; switching between the two pickers changes nothing until a day is chosen in the other. A row names its pattern: "Weekdays", "Mon, Fri", "Monthly · 1st, 15th", "Monthly · Last day".
 
 **Settings** holds the hour a new day starts, Effort and Cooling, the backup, and a way to reset HEAT. Effort, Cooling and the reset each ask for confirmation first, and their steps have names, never numbers.
 

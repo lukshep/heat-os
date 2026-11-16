@@ -434,6 +434,31 @@ button {
   color: var(--text);
 }
 
+/* Weekly or Monthly, then the days. */
+.repeat {
+  display: grid;
+  gap: 10px;
+}
+
+/*
+ * The days of the month, six to a row so each stays a full touch target at phone width.
+ * Last day takes the row of its own beneath them.
+ */
+.month-days {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.month-days .chip {
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-days .chip.is-wide {
+  grid-column: 1 / -1;
+}
+
 .text-button {
   min-height: 44px;
   display: inline-flex;

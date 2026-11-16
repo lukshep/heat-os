@@ -1,4 +1,4 @@
-import type { Schedule } from '../heat/schedule';
+import { LAST_DAY, type Schedule } from '../heat/schedule';
 
 /** Weekdays are numbered 0 (Sunday) to 6 (Saturday), as schedules store them. */
 
@@ -41,7 +41,21 @@ export function describeDays(days: readonly number[], locale?: string): string {
     .join(', ');
 }
 
+const ORDINAL_SUFFIX: Partial<Record<Intl.LDMLPluralRule, string>> = { one: 'st', two: 'nd', few: 'rd' };
+const ordinalRule = new Intl.PluralRules('en', { type: 'ordinal' });
+
+/** A day of the month as the app's English names it: 1st, 2nd, 3rd, 11th, 22nd. */
+export function ordinal(day: number): string {
+  return `${day}${ORDINAL_SUFFIX[ordinalRule.select(day)] ?? 'th'}`;
+}
+
+/** A day of a monthly schedule: its ordinal, or "Last day". */
+export function monthDayName(day: number): string {
+  return day === LAST_DAY ? 'Last day' : ordinal(day);
+}
+
 /** How a routine repeats, in a few words. */
 export function describeSchedule(schedule: Schedule, locale?: string): string {
-  return schedule.every === 'week' ? describeDays(schedule.days, locale) : 'Monthly';
+  if (schedule.every === 'week') return describeDays(schedule.days, locale);
+  return `Monthly · ${[...schedule.days].sort((a, b) => a - b).map(monthDayName).join(', ')}`;
 }

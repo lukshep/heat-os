@@ -1,10 +1,10 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { ItemPatch } from '../data/reducer';
 import type { ListItem, Place } from '../data/selectors';
-import type { Schedule } from '../heat/schedule';
+import { LAST_DAY, type Schedule } from '../heat/schedule';
 import { CheckIcon } from './icons';
 import { heatColor } from './temperature';
-import { describeSchedule, weekdayName, weekdayOrder } from './weekdays';
+import { describeSchedule, monthDayName, weekdayName, weekdayOrder } from './weekdays';
 
 interface Props {
   item: ListItem;
@@ -92,6 +92,12 @@ export function ItemRow(props: Props) {
 
 const INBOX = 'inbox';
 
+/**
+ * The days the monthly picker offers before Last day. The 31st is left out: a day a month lacks
+ * falls on its last day, so the 31st and Last day are the same thing.
+ */
+const MONTH_DAYS = Array.from({ length: LAST_DAY - 1 }, (_, index) => index + 1);
+
 /** The value of the "Keep it in" picker that stands for where the item is now. */
 function homeKey(item: ListItem): string {
   if (item.areaId === null) return INBOX;
@@ -100,7 +106,9 @@ function homeKey(item: ListItem): string {
 
 function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
   const [title, setTitle] = useState(item.title);
-  const weekdays = item.repeat?.every === 'week' ? item.repeat.days : [];
+  // Which picker is showing. Switching it changes nothing until a day is chosen in it.
+  const [every, setEvery] = useState<Schedule['every']>(item.repeat?.every ?? 'week');
+  const chosen = item.repeat?.every === every ? item.repeat.days : [];
 
   function commitTitle() {
     const next = title.trim();
@@ -108,9 +116,10 @@ function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
     else setTitle(item.title);
   }
 
+  /** The first day chosen makes it a routine, and clearing the last makes it a one-off task. */
   function toggleDay(day: number) {
-    const days = weekdays.includes(day) ? weekdays.filter((other) => other !== day) : [...weekdays, day];
-    onSetSchedule({ every: 'week', days });
+    const days = chosen.includes(day) ? chosen.filter((other) => other !== day) : [...chosen, day];
+    onSetSchedule({ every, days });
   }
 
   return (
@@ -162,16 +171,44 @@ function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
       </label>
 
       <div>
-        <div className="editor-label">Repeat on</div>
+        <div className="editor-label">Repeat</div>
         {item.areaId === null ? (
           <p className="editor-hint">File it under an area first, then it can repeat.</p>
         ) : (
-          <div className="chips" role="group" aria-label="Repeat on">
-            {weekdayOrder().map((day) => (
-              <Chip key={day} pressed={weekdays.includes(day)} onClick={() => toggleDay(day)}>
-                {weekdayName(day)}
+          <div className="repeat">
+            <div className="chips" role="group" aria-label="How often">
+              <Chip pressed={every === 'week'} onClick={() => setEvery('week')}>
+                Weekly
               </Chip>
-            ))}
+              <Chip pressed={every === 'month'} onClick={() => setEvery('month')}>
+                Monthly
+              </Chip>
+            </div>
+            {every === 'week' ? (
+              <div className="chips" role="group" aria-label="Repeat on weekdays">
+                {weekdayOrder().map((day) => (
+                  <Chip key={day} pressed={chosen.includes(day)} onClick={() => toggleDay(day)}>
+                    {weekdayName(day)}
+                  </Chip>
+                ))}
+              </div>
+            ) : (
+              <div className="month-days" role="group" aria-label="Repeat on days of the month">
+                {MONTH_DAYS.map((day) => (
+                  <Chip
+                    key={day}
+                    pressed={chosen.includes(day)}
+                    onClick={() => toggleDay(day)}
+                    label={monthDayName(day)}
+                  >
+                    {day}
+                  </Chip>
+                ))}
+                <Chip pressed={chosen.includes(LAST_DAY)} onClick={() => toggleDay(LAST_DAY)} wide>
+                  {monthDayName(LAST_DAY)}
+                </Chip>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -183,9 +220,25 @@ function Editor({ item, places, onUpdate, onSetSchedule, onDelete }: Props) {
   );
 }
 
-function Chip(props: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+interface ChipProps {
+  pressed: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  /** A spoken name, for a chip whose text alone says too little, such as a bare day number. */
+  label?: string;
+  /** Takes a whole row of a grid. */
+  wide?: boolean;
+}
+
+function Chip(props: ChipProps) {
   return (
-    <button className="chip" type="button" aria-pressed={props.pressed} onClick={props.onClick}>
+    <button
+      className={props.wide ? 'chip is-wide' : 'chip'}
+      type="button"
+      aria-pressed={props.pressed}
+      aria-label={props.label}
+      onClick={props.onClick}
+    >
       {props.children}
     </button>
   );
