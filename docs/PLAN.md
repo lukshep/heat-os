@@ -30,7 +30,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M19 | Priority first, Friction in stars, saved format version 7 | Deployed 2026-11-15; not yet tried on an iPhone |
 | M20 | Retune: an even area ladder, stronger stars, rings up to the Surge peak | Deployed 2026-11-15; not yet tried on an iPhone |
 | M21 | The gradient along the edge line, and a Surge sweep | Deployed 2026-11-15; not yet tried on an iPhone |
-| M22 | Task details: a description, subtasks and a panel | Built 2026-11-16; not yet deployed or tried on an iPhone |
+| M22 | Task details: a description, subtasks and a panel | Deployed 2026-11-16; not yet tried on an iPhone |
 
 The first prototype is M1–M3.
 
