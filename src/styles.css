@@ -52,7 +52,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -462,6 +463,10 @@ button {
   gap: 2px;
   padding: 6px 4px;
   text-align: left;
+  /* A long press opens the panel, so it must not select the title or raise the phone's own menu. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .row-title-text {
@@ -482,6 +487,11 @@ button {
   letter-spacing: 1px;
 }
 
+/* The row has a description or subtasks. A mark, never a count. */
+.row-has-details svg {
+  vertical-align: -1px;
+}
+
 .row-swap {
   flex: none;
   width: 44px;
@@ -496,16 +506,20 @@ button {
   color: var(--text);
 }
 
-/* The editor that opens under a row. */
+/*
+ * What opens under a row: its description, its subtasks to tick, and Edit. Subtasks are grey,
+ * like everything that is not temperature: they earn nothing.
+ */
 
-.editor {
+.details {
   display: grid;
-  gap: 14px;
-  padding: 4px 8px 18px 48px;
+  justify-items: start;
+  gap: 2px;
+  padding: 0 8px 10px 48px;
   animation: drop-in 180ms ease-out;
 }
 
-/* Panels that open under what was tapped: the editor, and a section's rename panel and add field. */
+/* Panels that open under what was tapped: a row's details, and a section's rename panel and add field. */
 @keyframes drop-in {
   from {
     opacity: 0;
@@ -513,8 +527,160 @@ button {
   }
 }
 
+.details-text {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 15px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.details-subtasks {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.details-subtask {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  text-align: left;
+}
+
+.details-subtask:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.details-subtask-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.details-subtask[aria-checked='true'] .details-subtask-title,
+.sheet-subtask.is-done input {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* A subtask's tick: a small grey square, unlike a row's round ring, which carries temperature. */
+.subtask-box {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--faint);
+  border-radius: 6px;
+  color: var(--bg);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+[aria-checked='true'] > .subtask-box {
+  border-color: var(--muted);
+  background: var(--muted);
+}
+
+/*
+ * A task's or a routine's panel, risen from the bottom over a dimmed screen. It sits under the
+ * edge line, which stays in view over both. Tall, so its first fields sit above a phone's
+ * keyboard, and it scrolls on its own.
+ */
+
+.sheet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.6);
+  animation: fade-in 200ms ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.sheet {
+  position: relative;
+  height: calc(100% - env(safe-area-inset-top) - 28px);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+  border-radius: 20px 20px 0 0;
+  background: var(--bg);
+  box-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+  animation: sheet-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet:focus {
+  outline: none;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(40%);
+    opacity: 0;
+  }
+}
+
+.sheet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 4px 12px 0 20px;
+}
+
+.sheet-kind {
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.sheet-done {
+  padding: 0 8px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 20px calc(env(safe-area-inset-bottom) + 28px);
+  scrollbar-width: none;
+}
+
+.sheet-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* The panel's contents, from the title down to Delete. */
+.editor {
+  display: grid;
+  gap: 18px;
+}
+
 .editor input,
 .editor select,
+.editor textarea,
 .add input,
 .place-edit input {
   width: 100%;
@@ -527,10 +693,69 @@ button {
 
 .editor input:focus,
 .editor select:focus,
+.editor textarea:focus,
 .add input:focus,
 .place-edit input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.editor .sheet-title {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+/* It grows with what is written, so it never needs a scroll bar of its own. */
+.editor .sheet-description {
+  display: block;
+  padding: 12px 14px;
+  overflow: hidden;
+  line-height: 1.4;
+  resize: none;
+}
+
+.sheet-subtasks {
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.sheet-subtask {
+  display: flex;
+  align-items: center;
+}
+
+/* Subtasks read as a list, so their fields show a border only while in use. */
+.editor .sheet-subtask input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.editor .sheet-subtask input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.subtask-tick,
+.sheet-subtask-remove {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.subtask-tick {
+  margin-left: -12px;
+}
+
+.sheet-subtask-remove {
+  margin-right: -12px;
+  color: var(--faint);
 }
 
 .editor-label {

@@ -25,7 +25,7 @@ It is a mobile-first Progressive Web App used mainly on iPhone and also in a des
 
 **The calendar** sits at the top of Today and looks forward only. A strip shows today and the next six days; the month's name above it opens a month grid, which can step forward month by month but not back past this one. Picking a later day turns Today into that day: the heading becomes its date, and the list holds the tasks planned for it and the routines due on it, Priority first and then timed ones, with no suggestions. A task there can be done early or edited. A routine there cannot be done until its date opens, except a monthly one open early, and a date done early shows its check. A "Plan for …" field adds a task planned for that day to the Inbox. Past days are dimmed and cannot be picked, because nothing is kept of what was or was not done on them. A day with a planned task or a monthly routine has a small grey dot, never a count; weekly routines leave no dot, or nearly every day would have one. Tapping the Today tab, "Back to today", or leaving Today returns to today.
 
-**Planned days.** A task can be given a day and, once it has one, a time. The editor's When row offers Today, Tomorrow, Pick (the device's own date picker) and None; Time uses the device's time picker and can be cleared. A routine has a Time but no day. Rows say when, from where today stands: "Today", "Tomorrow", "Yesterday", a weekday within the coming week, or else the date ("Nov 12"), with the time after it; on Today the day is left out and only the time shows. A planned day is not a deadline: once it passes, the task waits on Today under its date, with nothing marking it late.
+**Planned days.** A task can be given a day and, once it has one, a time. The panel's When row offers Today, Tomorrow, Pick (the device's own date picker) and None; Time uses the device's time picker and can be cleared. A routine has a Time but no day. Rows say when, from where today stands: "Today", "Tomorrow", "Yesterday", a weekday within the coming week, or else the date ("Nov 12"), with the time after it; on Today the day is left out and only the time shows. A planned day is not a deadline: once it passes, the task waits on Today under its date, with nothing marking it late.
 
 **Areas** opens on an overview: every area by name, in order, with its top-level projects on a quieter line beneath, and a field for a new area. Nothing there has a count or a colour of its own, since an area's colour would cool as it is worked and turn the overview into a record of the areas touched today. Tapping an area opens its page.
 
@@ -47,9 +47,13 @@ Projects are organisational only and have no progress. Any item can be moved to 
 - **There is no moving a single date.** Lateness is covered by the open window, and changing the days changes the routine from today on, keeping the warmth earned. A date still open when the days change counts if it was done and is dropped without a miss if not.
 - **Only a completion made today can be taken back from the row.** An older one would change HEAT on an earlier day. The Undo toast is unchanged.
 
-In the editor, **Repeat** starts with Daily, Weekly or Monthly. Daily applies at once, with no days to pick; it is saved as a weekly schedule on all seven days, so picking every weekday is the same thing. Weekly and Monthly only choose the picker below them: the weekday chips, or a grid of the 1st to the 30th with Last day on a row of its own. The first day chosen makes the task a routine and clearing the last makes it a one-off task again; switching between the pickers changes nothing until a day is chosen in the other. Whenever an item repeats, "Stop repeating" beneath makes it a one-off task again in one tap. A row names its pattern: "Daily", "Weekdays", "Mon, Fri", "Monthly · 1st, 15th", "Monthly · Last day".
+In the panel, **Repeat** starts with Daily, Weekly or Monthly. Daily applies at once, with no days to pick; it is saved as a weekly schedule on all seven days, so picking every weekday is the same thing. Weekly and Monthly only choose the picker below them: the weekday chips, or a grid of the 1st to the 30th with Last day on a row of its own. The first day chosen makes the task a routine and clearing the last makes it a one-off task again; switching between the pickers changes nothing until a day is chosen in the other. Whenever an item repeats, "Stop repeating" beneath makes it a one-off task again in one tap. A row names its pattern: "Daily", "Weekdays", "Mon, Fri", "Monthly · 1st, 15th", "Monthly · Last day".
 
-**Priority and Friction** sit at the top of the editor: a Priority chip, and five stars for Friction. Tapping a star sets that many; tapping the last lit star again clears them. A Priority item's title is bold and it is listed first wherever it appears, in the usual order among the other Priority items; its ring is the same as without it. A row shows its stars of Friction after its other details, filled ones only, in grey: "Health · Daily · ★★★". Nothing shows at none.
+**A row and its panel.** Tapping a task or a routine shows its description and subtasks beneath it, with an Edit button. A row with neither opens its panel straight away, and a long press, or a right click, always does. The panel rises from the bottom over a dimmed screen, under the edge line, which stays in view. It holds the title, the description and the subtasks, then Priority and Friction, When and Time, Keep it in, Repeat and Delete. Every change is saved as it is made; Done, a tap on the dimmed screen or Escape closes it. A row with a description or subtasks has a small grey mark after its other details, never a count.
+
+**Subtasks** are steps inside a task or a routine, added and renamed in the panel and ticked there or from the row. They earn nothing, never complete their item and are never counted: there is no "2 of 5". A tick is a small grey square, not a ring, since only temperature has colour. A routine's ticks belong to the date it is on, and clear by themselves when its next date opens; on a later day in the calendar it shows only the ticks for that date, and one not open yet cannot be ticked. A task made into a routine, or a routine back into a task, keeps its description and subtasks but not their ticks.
+
+**Priority and Friction** sit in the panel under the subtasks: a Priority chip, and five stars for Friction. Tapping a star sets that many; tapping the last lit star again clears them. A Priority item's title is bold and it is listed first wherever it appears, in the usual order among the other Priority items; its ring is the same as without it. A row shows its stars of Friction after its other details, filled ones only, in grey: "Health · Daily · ★★★". Nothing shows at none.
 
 **Settings** holds the hour a new day starts, Effort and Cooling, the backup, and a way to reset HEAT. Effort, Cooling and the reset each ask for confirmation first, and their steps have names, never numbers.
 
@@ -70,8 +74,15 @@ interface Project extends Meta { name: string; areaId: ID; parentId: ID | null; 
 
 type ClockTime = string; // 'HH:MM', 24-hour wall-clock time, never shifted between time zones
 
+interface Subtask {                          // part of its item, not a record of its own
+  id: ID; title: string;
+  checked: DayKey | null;                    // task: the day it was ticked; routine: the date it was ticked for
+}
+
 interface Task extends Meta {
-  title: string; note?: string;
+  title: string;
+  description: string;                       // plain text, '' for none
+  subtasks: Subtask[];                       // in the order they were added
   areaId: ID | null; projectId: ID | null;   // both null = Inbox
   priority: boolean;                         // listed first; earns nothing extra
   friction: number;                          // stars, 0 to 5
@@ -80,7 +91,8 @@ interface Task extends Meta {
 }
 
 interface Routine extends Meta {
-  title: string; areaId: ID; projectId: ID | null;
+  title: string; description: string; subtasks: Subtask[];
+  areaId: ID; projectId: ID | null;
   priority: boolean; friction: number;
   time: ClockTime | null;
   schedule:
@@ -116,6 +128,7 @@ interface AppState {
 - A project's `areaId` is the area its outermost ancestor sits in, and an item's `areaId` always matches its project's. Scoring only ever looks at the area.
 - Deleting a project moves what it held up one level. Nothing is deleted with it.
 - "Done" is derived from the completion log. Tasks have no `completedAt`.
+- Subtasks live inside their item, like a routine's days. They carry an id but not `createdAt`, `updatedAt` or `deletedAt`: removing one takes it out of the list, and the item's `updatedAt` records any change to them. A tick is item data, not a completion, so it never reaches HEAT. On a task any day means ticked; on a routine a tick counts only while its date is the one the routine is on (`routineDate`: the open date, or the date it was done for until the next opens, or today before its first date), so the ticks clear with no stored reset. Turning a task into a routine, or back, keeps the subtasks and clears their ticks.
 - Completions record facts, not scores, and snapshot everything needed to score them. Editing or deleting an item later never changes past HEAT.
 - Routine warmth is derived by walking the routine's dates after `warmthBase.asOf`. Each is settled once the next has come: kept if a completion counted for it (`occurrence`), missed if not. Editing a schedule re-snapshots the base so history is not reinterpreted.
 - A routine keeps the id of the task it was made from, and a task made from a routine keeps the routine's id. The record it left behind is soft-deleted, so an id is live in at most one of the two collections. A routine keeps the task's time but not its date; a task made from a routine has neither.
@@ -125,7 +138,7 @@ interface AppState {
 - `settings` holds the parts of the HEAT config a person can change: the hour a new day starts (midnight to 8 am), and Effort and Cooling. Everything else in the config is fixed by the build. A new day start applies from then on.
 - `settings.tuning` is every change of Effort and Cooling, oldest first, each with the moment it was made. Before the first both were Standard, and the last is in force now. The log is kept rather than just the current values because HEAT is replayed with whichever settings were in force at each moment.
 - `heatResetAt` is when HEAT was last reset. HEAT counts only completions after it. The completion log itself is untouched, so what was done stays done.
-- The saved format is at version 7. Version 1, from before settings existed, version 2, which also held the position of the line that used to be reached each day, version 3, from before Effort, Cooling and the reset, version 4, which saved the tags as `important` and `avoided`, version 5, from before dates, times and monthly routines, and version 6, from before Friction had stars, are upgraded on load. The version 5 upgrade gives tasks no date or time, makes every schedule weekly, and takes a completion's date from whether its day was scheduled, so neither past HEAT nor warmth moves. The version 6 upgrade gives a task or routine with Friction three stars, which earn what the tag earned, and keeps its Priority. A completion loses Priority and keeps exactly what it earned as stars: three for Friction (30%), two for Priority (20%), five for both. The upgraded shape is written at the next change.
+- The saved format is at version 8. Version 1, from before settings existed, version 2, which also held the position of the line that used to be reached each day, version 3, from before Effort, Cooling and the reset, version 4, which saved the tags as `important` and `avoided`, version 5, from before dates, times and monthly routines, version 6, from before Friction had stars, and version 7, from before descriptions and subtasks, are upgraded on load. The version 7 upgrade gives every task and routine an empty description and no subtasks; a task's unused `note`, if one is there, becomes its description. The version 5 upgrade gives tasks no date or time, makes every schedule weekly, and takes a completion's date from whether its day was scheduled, so neither past HEAT nor warmth moves. The version 6 upgrade gives a task or routine with Friction three stars, which earn what the tag earned, and keeps its Priority. A completion loses Priority and keeps exactly what it earned as stars: three for Friction (30%), two for Priority (20%), five for both. The upgraded shape is written at the next change.
 - `deferred` holds the tasks swapped out of Today's suggestions. It only counts on the day it was made and is not meant to sync.
 - Sync readiness consists of stable IDs, `updatedAt`, soft-delete tombstones, an append-only log, and a fold that ignores duplicates (one completion per task; one per routine per day).
 
@@ -280,6 +293,7 @@ Nothing else marks Surge. It is not named in the app, and no record is kept of r
 | Late completions | Each date stays open until the next, so a twice-weekly routine done a day late keeps its warmth | Intended: consistency is doing each one, not doing it on the dot. Daily routines are unaffected, and a routine counts once per date, so there are no extra off-day completions |
 | Retroactive retuning | Changing the defaults in a new build rewrites current HEAT, because it is derived. The Surge change raised everyone's current HEAT when it landed | Wanted in the simulator. A person's own Effort and Cooling apply from the moment they change, so they never rewrite it |
 | Settings as a lever | Switching to Easier for a burst of work and back again keeps what was earned under Easier | Accepted for a personal app. The confirmation is the friction |
+| Subtasks as a checklist | Ticking steps could start to feel like progress, or like a list to finish each day | They earn nothing, have no colour, are never counted and never complete their item. A routine's ticks clear when its next date opens, not at midnight |
 | Stacked settings | Easier and Slower together put a balanced day at 99, just short of a full gauge | Accepted: both were chosen. The scenario tests keep a balanced day out of Surge on every combination |
 
 One ordering effect is intended: completing the warm or high-Friction item first in an area earns more than completing a plain one first, because warmth and Friction are both a share of a reward that shrinks with each task in the area.

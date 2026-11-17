@@ -310,3 +310,112 @@ describe('replacing the state', () => {
     expect(run(fresh(), { type: 'state/replace', state: other })).toBe(other);
   });
 });
+
+describe('descriptions and subtasks', () => {
+  const addSubtask = (itemId: ID, id: ID, title: string, at = 4000): Action => ({
+    type: 'subtask/add',
+    itemId,
+    id,
+    at,
+    title,
+  });
+
+  function withTask(): AppState {
+    return run(fresh(), addTask('t1', 'Pack for the trip'));
+  }
+
+  const task = (state: AppState) => {
+    const found = state.tasks.t1;
+    if (!found) throw new Error('No task t1');
+    return found;
+  };
+
+  it('starts a task with no description and no subtasks', () => {
+    expect(task(withTask())).toMatchObject({ description: '', subtasks: [] });
+  });
+
+  it('takes a description, keeping its lines and dropping space at either end', () => {
+    const state = run(withTask(), {
+      type: 'task/update',
+      id: 't1',
+      at: 5000,
+      patch: { description: '  Passport\n\nCharger  ' },
+    });
+    expect(task(state).description).toBe('Passport\n\nCharger');
+    expect(task(state).updatedAt).toBe(5000);
+    const cleared = run(state, { type: 'task/update', id: 't1', at: 6000, patch: { description: '   ' } });
+    expect(task(cleared).description).toBe('');
+  });
+
+  it('adds subtasks in order, trimmed and unticked, and ignores a blank title or a repeated id', () => {
+    const state = run(
+      withTask(),
+      addSubtask('t1', 's1', '  Passport '),
+      addSubtask('t1', 's2', 'Charger', 4100),
+      addSubtask('t1', 's3', '   '),
+      addSubtask('t1', 's1', 'Again'),
+    );
+    expect(task(state).subtasks).toEqual([
+      { id: 's1', title: 'Passport', checked: null },
+      { id: 's2', title: 'Charger', checked: null },
+    ]);
+    expect(task(state).updatedAt).toBe(4100);
+  });
+
+  it('renames, ticks, unticks and removes a subtask, leaving the others as they were', () => {
+    let state = run(withTask(), addSubtask('t1', 's1', 'Passport'), addSubtask('t1', 's2', 'Charger'));
+    state = run(
+      state,
+      { type: 'subtask/rename', itemId: 't1', id: 's2', at: 5000, title: ' Phone charger ' },
+      { type: 'subtask/rename', itemId: 't1', id: 's2', at: 5100, title: '  ' },
+      { type: 'subtask/check', itemId: 't1', id: 's1', at: 5200, checked: DAY_1 },
+    );
+    expect(task(state).subtasks).toEqual([
+      { id: 's1', title: 'Passport', checked: DAY_1 },
+      { id: 's2', title: 'Phone charger', checked: null },
+    ]);
+
+    state = run(
+      state,
+      { type: 'subtask/check', itemId: 't1', id: 's1', at: 5300, checked: null },
+      { type: 'subtask/delete', itemId: 't1', id: 's2', at: 5400 },
+    );
+    expect(task(state).subtasks).toEqual([{ id: 's1', title: 'Passport', checked: null }]);
+  });
+
+  it('refuses a tick for something that is not a day', () => {
+    const state = run(withTask(), addSubtask('t1', 's1', 'Passport'));
+    const after = run(state, { type: 'subtask/check', itemId: 't1', id: 's1', at: 5000, checked: 'tomorrow' });
+    expect(after).toBe(state);
+  });
+
+  it('leaves the state alone for an unknown subtask, an unknown item or a deleted one', () => {
+    const state = run(withTask(), addSubtask('t1', 's1', 'Passport'));
+    expect(run(state, { type: 'subtask/delete', itemId: 't1', id: 'nope', at: 5000 })).toBe(state);
+    expect(run(state, { type: 'subtask/rename', itemId: 't1', id: 'nope', at: 5000, title: 'X' })).toBe(state);
+    expect(run(state, addSubtask('nope', 's2', 'Charger'))).toBe(state);
+
+    const deleted = run(state, { type: 'task/delete', id: 't1', at: 5000 });
+    expect(run(deleted, addSubtask('t1', 's2', 'Charger'))).toBe(deleted);
+    expect(run(deleted, { type: 'subtask/check', itemId: 't1', id: 's1', at: 6000, checked: DAY_1 })).toBe(deleted);
+  });
+
+  it('never completes the task: ticking every subtask leaves it open and logs nothing', () => {
+    const state = run(withTask(), addSubtask('t1', 's1', 'Passport'), {
+      type: 'subtask/check',
+      itemId: 't1',
+      id: 's1',
+      at: 5000,
+      checked: DAY_1,
+    });
+    expect(openTasks(state).map((open) => open.id)).toEqual(['t1']);
+    expect(liveCompletions(state)).toEqual([]);
+  });
+
+  it('stay with a task once it is completed, and with it if the completion is undone', () => {
+    let state = run(withTask(), addSubtask('t1', 's1', 'Passport'), complete('c1', 't1', 5000));
+    expect(task(state).subtasks).toHaveLength(1);
+    state = run(state, { type: 'completion/undo', id: 'c1', at: 6000 });
+    expect(openTasks(state)[0]?.subtasks).toEqual([{ id: 's1', title: 'Passport', checked: null }]);
+  });
+});

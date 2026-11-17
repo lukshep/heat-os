@@ -12,6 +12,8 @@ import { ItemList } from './ItemList';
 interface Props {
   view: View;
   onComplete: (item: ListItem) => void;
+  /** Opens an item's panel. */
+  onEdit: (item: ListItem) => void;
   /** The day being shown: today, or a later day picked on the calendar. */
   day: DayKey;
   onPickDay: (day: DayKey) => void;
@@ -24,7 +26,7 @@ interface Props {
  */
 const SUGGESTION_COUNT = 5;
 
-export function Today({ view, onComplete, day, onPickDay }: Props) {
+export function Today({ view, onComplete, onEdit, day, onPickDay }: Props) {
   return (
     <>
       <Calendar
@@ -34,16 +36,16 @@ export function Today({ view, onComplete, day, onPickDay }: Props) {
         onPick={onPickDay}
       />
       {day === view.today ? (
-        <TodayList view={view} onComplete={onComplete} />
+        <TodayList view={view} onComplete={onComplete} onEdit={onEdit} />
       ) : (
         // Keyed by its day, so moving to another day starts afresh: an empty field, nothing open.
-        <LaterDay key={day} view={view} onComplete={onComplete} day={day} />
+        <LaterDay key={day} view={view} onComplete={onComplete} onEdit={onEdit} day={day} />
       )}
     </>
   );
 }
 
-function TodayList({ view, onComplete }: Pick<Props, 'view' | 'onComplete'>) {
+function TodayList({ view, onComplete, onEdit }: Pick<Props, 'view' | 'onComplete' | 'onEdit'>) {
   const actions = useActions();
 
   // What is settled for today comes first: Priority, then anything with a time, then routines
@@ -72,6 +74,7 @@ function TodayList({ view, onComplete }: Pick<Props, 'view' | 'onComplete'>) {
       items={[...plan.settled, ...picks]}
       view={view}
       onComplete={onComplete}
+      onEdit={onEdit}
       showPlace
       listDay={view.today}
       trailing={(item) =>
@@ -94,7 +97,7 @@ function TodayList({ view, onComplete }: Pick<Props, 'view' | 'onComplete'>) {
  * A later day: what is planned for it and the routines due on it, and a field for planning
  * more. No suggestions. A task can be done early; a routine only where its date has opened.
  */
-function LaterDay({ view, onComplete, day }: Pick<Props, 'view' | 'onComplete' | 'day'>) {
+function LaterDay({ view, onComplete, onEdit, day }: Pick<Props, 'view' | 'onComplete' | 'onEdit' | 'day'>) {
   const actions = useActions();
   const rows = dayList(view.state, view.items, day, view.config.dayStartHour);
 
@@ -109,6 +112,7 @@ function LaterDay({ view, onComplete, day }: Pick<Props, 'view' | 'onComplete' |
           items={rows}
           view={view}
           onComplete={onComplete}
+          onEdit={onEdit}
           showPlace
           listDay={day}
           routinesStay

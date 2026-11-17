@@ -13,6 +13,7 @@ import {
   type Project,
   type Routine,
   type Settings,
+  type Subtask,
   type Task,
 } from './model';
 
@@ -25,7 +26,7 @@ import {
  * task that has a date. A routine takes a time but never a date.
  */
 export type ItemPatch = Partial<
-  Pick<Task, 'title' | 'areaId' | 'projectId' | 'priority' | 'friction' | 'date' | 'time'>
+  Pick<Task, 'title' | 'description' | 'areaId' | 'projectId' | 'priority' | 'friction' | 'date' | 'time'>
 >;
 
 /**
@@ -67,6 +68,12 @@ export type Action =
       occurrence: DayKey | null;
     }
   | { type: 'completion/undo'; id: ID; at: number }
+  /** Adds a subtask at the end of a task's or a routine's list. `itemId` is the task or routine. */
+  | { type: 'subtask/add'; itemId: ID; id: ID; at: number; title: string }
+  | { type: 'subtask/rename'; itemId: ID; id: ID; at: number; title: string }
+  | { type: 'subtask/delete'; itemId: ID; id: ID; at: number }
+  /** Ticks a subtask for a day (see `Subtask.checked`), or unticks it with null. */
+  | { type: 'subtask/check'; itemId: ID; id: ID; at: number; checked: DayKey | null }
   | { type: 'area/add'; id: ID; at: number; name: string }
   | { type: 'area/rename'; id: ID; at: number; name: string }
   | { type: 'area/delete'; id: ID; at: number }
@@ -151,6 +158,8 @@ function requestedHome(state: AppState, patch: ItemPatch): Home | null {
 function patched<T extends Task | Routine>(record: T, patch: ItemPatch, at: number): T {
   const next = { ...record, updatedAt: at };
   if (patch.title !== undefined && patch.title.trim()) next.title = patch.title.trim();
+  // Its lines are kept as written; only space at either end goes.
+  if (patch.description !== undefined) next.description = patch.description.trim();
   if (patch.priority !== undefined) next.priority = patch.priority;
   if (patch.friction !== undefined && Number.isFinite(patch.friction)) next.friction = cleanStars(patch.friction);
   if (patch.time === null || isClockTime(patch.time)) next.time = patch.time;
@@ -162,6 +171,46 @@ function cleanStars(stars: number): number {
   return Math.min(FRICTION_STARS, Math.max(0, Math.round(stars)));
 }
 
+/**
+ * Subtasks for an item that has just changed between task and routine. A tick means a different
+ * thing on each, so none is kept.
+ */
+function unticked(subtasks: readonly Subtask[]): Subtask[] {
+  return subtasks.map((subtask) => ({ ...subtask, checked: null }));
+}
+
+/**
+ * Applies `change` to the subtasks of the live task or routine `itemId`; an id is live in at
+ * most one of the two. Leaves the state as it is when there is no such item, or when `change`
+ * returns null to say the request does not apply.
+ */
+function withSubtasks(
+  state: AppState,
+  itemId: ID,
+  at: number,
+  change: (subtasks: readonly Subtask[]) => Subtask[] | null,
+): AppState {
+  const task = state.tasks[itemId];
+  if (isLive(task)) {
+    const subtasks = change(task.subtasks);
+    if (subtasks === null) return state;
+    return { ...state, tasks: { ...state.tasks, [itemId]: { ...task, subtasks, updatedAt: at } } };
+  }
+  const routine = state.routines[itemId];
+  if (isLive(routine)) {
+    const subtasks = change(routine.subtasks);
+    if (subtasks === null) return state;
+    return { ...state, routines: { ...state.routines, [itemId]: { ...routine, subtasks, updatedAt: at } } };
+  }
+  return state;
+}
+
+/** The list with subtask `id` changed, or null when it has no such subtask. */
+function changeSubtask(subtasks: readonly Subtask[], id: ID, change: (subtask: Subtask) => Subtask): Subtask[] | null {
+  if (!subtasks.some((subtask) => subtask.id === id)) return null;
+  return subtasks.map((subtask) => (subtask.id === id ? change(subtask) : subtask));
+}
+
 /** Retires a routine and leaves a one-off task with the same id in `areaId`. */
 function demote(state: AppState, routine: Routine, areaId: ID | null, at: number): Pick<AppState, 'tasks' | 'routines'> {
   const task: Task = {
@@ -170,6 +219,8 @@ function demote(state: AppState, routine: Routine, areaId: ID | null, at: number
     updatedAt: at,
     deletedAt: null,
     title: routine.title,
+    description: routine.description,
+    subtasks: unticked(routine.subtasks),
     areaId,
     projectId: areaId === null ? null : routine.projectId,
     priority: routine.priority,
@@ -197,6 +248,8 @@ export function reduce(state: AppState, action: Action): AppState {
         updatedAt: action.at,
         deletedAt: null,
         title,
+        description: '',
+        subtasks: [],
         ...home,
         priority: false,
         friction: 0,
@@ -259,6 +312,8 @@ export function reduce(state: AppState, action: Action): AppState {
         updatedAt: action.at,
         deletedAt: null,
         title: task.title,
+        description: task.description,
+        subtasks: unticked(task.subtasks),
         areaId: task.areaId,
         projectId: task.projectId,
         priority: task.priority,
@@ -350,6 +405,39 @@ export function reduce(state: AppState, action: Action): AppState {
           [completion.id]: { ...completion, updatedAt: action.at, deletedAt: action.at },
         },
       };
+    }
+
+    case 'subtask/add': {
+      const title = action.title.trim();
+      if (!title) return state;
+      return withSubtasks(state, action.itemId, action.at, (subtasks) =>
+        subtasks.some((subtask) => subtask.id === action.id)
+          ? null
+          : [...subtasks, { id: action.id, title, checked: null }],
+      );
+    }
+
+    case 'subtask/rename': {
+      const title = action.title.trim();
+      if (!title) return state;
+      return withSubtasks(state, action.itemId, action.at, (subtasks) =>
+        changeSubtask(subtasks, action.id, (subtask) => ({ ...subtask, title })),
+      );
+    }
+
+    case 'subtask/delete':
+      return withSubtasks(state, action.itemId, action.at, (subtasks) =>
+        subtasks.some((subtask) => subtask.id === action.id)
+          ? subtasks.filter((subtask) => subtask.id !== action.id)
+          : null,
+      );
+
+    case 'subtask/check': {
+      const { checked } = action;
+      if (checked !== null && !isDayKey(checked)) return state;
+      return withSubtasks(state, action.itemId, action.at, (subtasks) =>
+        changeSubtask(subtasks, action.id, (subtask) => ({ ...subtask, checked })),
+      );
     }
 
     case 'area/add': {

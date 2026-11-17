@@ -30,6 +30,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M19 | Priority first, Friction in stars, saved format version 7 | Deployed 2026-11-15; not yet tried on an iPhone |
 | M20 | Retune: an even area ladder, stronger stars, rings up to the Surge peak | Deployed 2026-11-15; not yet tried on an iPhone |
 | M21 | The gradient along the edge line, and a Surge sweep | Deployed 2026-11-15; not yet tried on an iPhone |
+| M22 | Task details: a description, subtasks and a panel | Built 2026-11-16; not yet deployed or tried on an iPhone |
 
 The first prototype is M1–M3.
 
@@ -493,9 +494,29 @@ Chosen from mockups of the line. No change to saved data or scoring.
 
 Verified on a production build at phone size, with made-up completions that brought HEAT to 98: the gradient along the line, slate at the top centre to yellow near the close; completing a routine took HEAT over 100 and played the sweep, checked frame by frame with the animations held: halfway round at half time, the tip at the loop's leading end, full until about three quarters of the way and gone at the close, the gradient still showing ahead of the loop, then hidden, and the shimmer waiting for the close. Reopening in Surge showed the closed loop with no sweep. No console errors. The browser pane was hidden, so the sweep was never seen running at its own speed, and nothing has been tried on an iPhone, where the cost of a hundred pieces under a glow is the thing to watch.
 
+### M22 — Task details: a description, subtasks and a panel
+
+Asked for on 2026-11-16: tasks with a description and subtasks shown under the row when it is tapped, and the editor moved into a panel. The request was a panel reached by swiping a row left; area pages already swipe sideways between areas, so the panel opens from the row instead (decision 57). No change to scoring.
+
+- **Tapping a row** shows its description and subtasks beneath it, with Edit. A row with neither opens its panel straight away, so editing a plain task is still one tap. A long press (500 ms, cancelled by 10 points of drift or by the list starting to scroll) or a right click always opens it, and the click that ends a long press does nothing more. The title cannot be selected and raises no phone menu. A row with details has a small grey mark (`DetailsIcon`) after its other details.
+- **The panel** (`src/ui/ItemSheet.tsx`) rises from the bottom over a dimmed screen, to about 90% of its height so its first fields sit above a phone's keyboard, and scrolls on its own. The edge line stays above it. It holds the title, a description that grows as it is written, the subtasks (tick, rename, remove, and a field that stays ready for the next), then the editor as it was: Priority and Friction, When and Time, Keep it in, Repeat, Delete. It says whether it is a task or a routine, since Repeat can change that while it is open. The shell holds which item it is for and finds the item afresh each time, so it stays open when the item moves or turns into a routine, and closes when the item is deleted.
+- **Closing**: Done, Escape, or a tap that starts on the dimmed screen. A long press opens the panel under the finger, which then lifts over the dim; that lift does not close it. A field still being typed in is saved when the panel closes, since a phone can close it without the field ever being left. Everything behind is `inert` while it is open, focus moves into it, and goes back to the row afterwards.
+- **Subtasks earn nothing** and never complete their item; the ring is still the only way. Their ticks are grey squares, and nothing ever counts them. A routine's ticks belong to the date it is on (`routineDate`) and clear by themselves when the next opens; on a later day a routine shows only that date's ticks, and one not open yet cannot be ticked.
+- **Moving between task and routine** keeps the description and subtasks and clears their ticks, which mean different things on each.
+
+Saved data: version 8. Every task and routine gains `description` ('') and `subtasks` ([]); the `note` field a task could carry, which nothing wrote, becomes its description if present and is gone from the model. Subtasks live inside their item rather than as records with their own `Meta` (decision 60). The step is tested against a version 7 document, and the older version fixtures now start from version 7's shape.
+
+Verified: unit tests for the reducer (description, adding, renaming, ticking, unticking and removing subtasks, refusing a bad day, an unknown or deleted item, no completion logged), routine ticks (kept while the date is open and while done, cleared by the next date, today before the first date, a later day's own ticks, carried across task and routine without ticks) and the version 7 upgrade and shape checks. On a production build at 390 points wide, with a made-up version 7 document: it loaded and was saved as version 8 at the first change, with the note as a description; a bare row opened the panel; a three-line description grew its field; three subtasks added in a row; the row then showed its details, and a tick from the list was saved for today with no completion and the ring unchanged; a drifting press opened nothing, a short tap toggled the details, a held press opened the panel and its ending click changed nothing; the lift over the dim kept the panel open and a tap on it closed it; Escape closed it and focus went back to the row; a subtask renamed and closed with Escape still in the field was saved; a task with a ticked subtask made Daily stayed open as a routine with the tick cleared; a routine tick moved to yesterday showed unticked; a routine completed from its area kept its tick while done; a right click opened the panel and the next click worked. No console errors. Long presses and lifts were sent as pointer events, not touches, and nothing was tried on an iPhone.
+
+Open after this pass:
+
+1. **The keyboard over the panel on an iPhone.** The panel is tall so its fields sit high, and `useFullHeight` refits after the keyboard, but only the phone can say whether iOS moves the page.
+2. **The long press on an iPhone**: whether 500 ms feels right, and whether iOS still selects text or shows its menu.
+3. **Subtasks cannot be reordered** or turned into tasks.
+
 ### Later, not planned in detail
 
-Cloud sync, routine pause, notifications, reordering areas.
+Cloud sync, routine pause, notifications, reordering areas, reordering subtasks.
 
 ## Decisions
 
@@ -556,6 +577,11 @@ Cloud sync, routine pause, notifications, reordering areas.
 | 53 | Splitting a task is bounded at five times one task, not four | Decided 2026-11-15 |
 | 54 | The edge line carries the whole gradient along its length below 100 | Decided 2026-11-15 |
 | 55 | Going over 100 plays a sweep round the edge, once per crossing, never on opening. It is the line itself, so it stays within "Surge is shown only by the edge line" | Decided 2026-11-15 |
+| 56 | Tasks and routines have a description and subtasks. Subtasks earn nothing, never complete their item, and are never counted | Decided 2026-11-16 |
+| 57 | Tapping a row shows its details with Edit; a row with none opens its panel; a long press always does. Swiping a row was set aside because area pages already swipe sideways | Decided 2026-11-16, chosen over swiping left |
+| 58 | An item's settings live in a panel that rises from the bottom, not under its row | Decided 2026-11-16 |
+| 59 | A routine's subtask ticks belong to the date it is on and clear by themselves when the next opens | Decided 2026-11-16 |
+| 60 | Subtasks live inside their item, like a routine's days, not as records with their own `createdAt`, `updatedAt` and `deletedAt` | Decided 2026-11-16 |
 
 ## Tuning log
 

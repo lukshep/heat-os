@@ -2,7 +2,15 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 import type { AppState, ID, Settings } from '../data/model';
 import type { Tuning } from '../heat/config';
 import { reduce, type Action, type ItemPatch } from '../data/reducer';
-import { heatConfig, routineLog, routineToday, routineWarmth, type ListItem } from '../data/selectors';
+import {
+  heatConfig,
+  isTicked,
+  routineDate,
+  routineLog,
+  routineToday,
+  routineWarmth,
+  type ListItem,
+} from '../data/selectors';
 import type { StorageAdapter } from '../data/storage';
 import { addDays, type DayKey } from '../heat/day';
 import type { Schedule } from '../heat/schedule';
@@ -49,6 +57,12 @@ export interface Actions {
   /** Returns the completion's id, which is what undo needs. */
   complete(item: ListItem): ID;
   undoCompletion(completionId: ID): void;
+  /** Adds a subtask at the end of an item's list. */
+  addSubtask(item: ListItem, title: string): void;
+  renameSubtask(item: ListItem, subtaskId: ID, title: string): void;
+  deleteSubtask(item: ListItem, subtaskId: ID): void;
+  /** Ticks or unticks a subtask. A routine's tick is for the date it is on now. Never a completion. */
+  toggleSubtask(item: ListItem, subtaskId: ID): void;
   addArea(name: string): void;
   renameArea(id: ID, name: string): void;
   deleteArea(id: ID): void;
@@ -149,6 +163,27 @@ export function createActions(store: AppStore): Actions {
     },
 
     undoCompletion: (id) => store.dispatch({ type: 'completion/undo', id, at: clock.touch() }),
+
+    addSubtask: (item, title) =>
+      store.dispatch({ type: 'subtask/add', itemId: item.id, id: newId(), at: clock.touch(), title }),
+    renameSubtask: (item, id, title) =>
+      store.dispatch({ type: 'subtask/rename', itemId: item.id, id, at: clock.touch(), title }),
+    deleteSubtask: (item, id) => store.dispatch({ type: 'subtask/delete', itemId: item.id, id, at: clock.touch() }),
+
+    toggleSubtask(item, id) {
+      const at = clock.touch();
+      const today = dayOf(at);
+      const state = store.getState();
+      // Read from the saved record, not the row, in case the day turned over since it was drawn.
+      const routine = state.routines[item.id];
+      const live = routine !== undefined && routine.deletedAt === null ? routine : undefined;
+      const subtask = (live ?? state.tasks[item.id])?.subtasks.find((candidate) => candidate.id === id);
+      if (!subtask) return;
+      const date = live ? routineDate(live, routineLog(state, live.id), today) : null;
+      const checked = isTicked(subtask.checked, date) ? null : (date ?? today);
+      store.dispatch({ type: 'subtask/check', itemId: item.id, id, at, checked });
+    },
+
     addArea: (name) => store.dispatch({ type: 'area/add', id: newId(), at: clock.touch(), name }),
     renameArea: (id, name) => store.dispatch({ type: 'area/rename', id, at: clock.touch(), name }),
     deleteArea: (id) => store.dispatch({ type: 'area/delete', id, at: clock.touch() }),

@@ -12,6 +12,8 @@ interface Props {
   items: readonly ListItem[];
   view: View;
   onComplete: (item: ListItem) => void;
+  /** Opens an item's panel. */
+  onEdit: (item: ListItem) => void;
   /** Say on each row where it lives. For lists that mix places. */
   showPlace?: boolean;
   /** Routines stay in this list once done for the day, shown as done. False on Today, where they leave. */
@@ -25,10 +27,11 @@ interface Props {
 
 /**
  * A list of rows, each coloured by the points it would earn right now, Priority first. One row
- * opens at a time.
+ * shows its details at a time.
  */
 export function ItemList(props: Props) {
-  const { items, view, onComplete, showPlace = false, routinesStay = false, listDay, canComplete, trailing } = props;
+  const { items, view, onComplete, onEdit, showPlace = false, routinesStay = false, listDay, canComplete, trailing } =
+    props;
   const actions = useActions();
   const [openId, setOpenId] = useState<ID | null>(null);
 
@@ -52,7 +55,6 @@ export function ItemList(props: Props) {
           key={item.id}
           item={item}
           temperature={temperature(item)}
-          places={view.places}
           today={view.today}
           listDay={listDay}
           open={openId === item.id}
@@ -62,9 +64,8 @@ export function ItemList(props: Props) {
           onToggle={() => setOpenId(openId === item.id ? null : item.id)}
           onComplete={() => onComplete(item)}
           onUndo={() => item.undoId !== null && actions.undoCompletion(item.undoId)}
-          onUpdate={(patch) => actions.updateItem(item, patch)}
-          onSetSchedule={(schedule) => actions.setSchedule(item, schedule)}
-          onDelete={() => actions.deleteItem(item)}
+          onEdit={() => onEdit(item)}
+          onToggleSubtask={(subtaskId) => actions.toggleSubtask(item, subtaskId)}
           context={showPlace ? placeLabel(view.places, item) : undefined}
           trailing={trailing?.(item)}
         />

@@ -36,12 +36,24 @@ function eachRecord(collection: Record<string, any>, change: (record: any) => an
   return Object.fromEntries(Object.entries(collection).map(([id, record]) => [id, change(record)]));
 }
 
+/** A current document as version 7 saved it: tasks and routines with no description or subtasks. */
+function versionSeven(): Record<string, any> {
+  const document = current();
+  const withoutDetails = ({ description: _description, subtasks: _subtasks, ...rest }: any) => rest;
+  return {
+    ...document,
+    schemaVersion: 7,
+    tasks: eachRecord(document.tasks, withoutDetails),
+    routines: eachRecord(document.routines, withoutDetails),
+  };
+}
+
 /**
  * A current document as version 6 saved it: Priority and Friction as tags on tasks, routines
  * and completions alike.
  */
 function versionSix(): Record<string, any> {
-  const document = current();
+  const document = versionSeven();
   const asTag = (record: any) => ({ ...record, friction: record.friction > 0 });
   return {
     ...document,
@@ -589,7 +601,8 @@ describe('saved data from before Friction had stars (version 6)', () => {
     const state = parseState(old);
     const { priority: _priority, ...rest } = old.completions.c1;
     expect(state?.completions.c1).toEqual({ ...rest, friction: 3 });
-    expect(state?.tasks.t1).toEqual({ ...old.tasks.t1, friction: 3 });
+    // Version 8 later added the description and subtasks.
+    expect(state?.tasks.t1).toEqual({ ...old.tasks.t1, friction: 3, description: '', subtasks: [] });
     expect(state?.areas).toEqual(old.areas);
     expect(state?.settings).toEqual(old.settings);
   });
@@ -619,5 +632,82 @@ describe('Friction stars', () => {
       document.tasks.t1.friction = friction;
       expect(parseState(document)).toBeNull();
     }
+  });
+});
+
+describe('saved data from before descriptions and subtasks (version 7)', () => {
+  /** A version 7 document with a routine as well as the task. */
+  function withRoutine(): Record<string, any> {
+    const old = versionSeven();
+    old.routines.r1 = {
+      id: 'r1',
+      createdAt: 2000,
+      updatedAt: 2000,
+      deletedAt: null,
+      title: 'Stretch',
+      areaId: 'a1',
+      projectId: null,
+      priority: false,
+      friction: 2,
+      time: '07:30',
+      schedule: { every: 'week', days: [1, 4] },
+      warmthBase: { warmth: 0.5, missRun: 0, asOf: '2026-01-04' },
+    };
+    return old;
+  }
+
+  it('is brought up to the current version', () => {
+    expect(parseState(withRoutine())?.schemaVersion).toBe(SCHEMA_VERSION);
+  });
+
+  it('gives every task and routine an empty description and no subtasks, and keeps the rest', () => {
+    const old = withRoutine();
+    const state = parseState(old);
+    expect(state?.tasks.t1).toEqual({ ...old.tasks.t1, description: '', subtasks: [] });
+    expect(state?.routines.r1).toEqual({ ...old.routines.r1, description: '', subtasks: [] });
+    expect(state?.completions).toEqual(old.completions);
+    expect(state?.settings).toEqual(old.settings);
+  });
+
+  it("makes a task's note its description", () => {
+    const old = withRoutine();
+    old.tasks.t1.note = 'Bring the forms';
+    const task = parseState(old)?.tasks.t1;
+    expect(task?.description).toBe('Bring the forms');
+    expect(task).not.toHaveProperty('note');
+  });
+
+  it('does not alter the document it was given', () => {
+    const old = withRoutine();
+    const before = JSON.stringify(old);
+    parseState(old);
+    expect(JSON.stringify(old)).toBe(before);
+  });
+});
+
+describe('descriptions and subtasks', () => {
+  it('are refused when damaged', () => {
+    const damage: ((document: Record<string, any>) => void)[] = [
+      (document) => (document.tasks.t1.description = null),
+      (document) => delete document.tasks.t1.subtasks,
+      (document) => (document.tasks.t1.subtasks = [{ id: 's1', title: 'Pack', checked: 'yesterday' }]),
+      (document) => (document.tasks.t1.subtasks = [{ id: 's1', checked: null }]),
+      (document) => (document.tasks.t1.subtasks = ['Pack']),
+    ];
+    for (const change of damage) {
+      const document = current();
+      change(document);
+      expect(parseState(document)).toBeNull();
+    }
+  });
+
+  it('are accepted ticked or not', () => {
+    const document = current();
+    document.tasks.t1.description = 'Two lines\nof notes';
+    document.tasks.t1.subtasks = [
+      { id: 's1', title: 'Pack', checked: '2026-01-05' },
+      { id: 's2', title: 'Book', checked: null },
+    ];
+    expect(parseState(document)?.tasks.t1).toEqual(document.tasks.t1);
   });
 });

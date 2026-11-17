@@ -101,6 +101,24 @@ export function CheckIcon() {
   );
 }
 
+/** A cross: take a subtask out of the list. */
+export function CloseIcon() {
+  return (
+    <svg {...base} width={18} height={18}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+/** Three lines of text, the last one short: a row has a description or subtasks to show. */
+export function DetailsIcon() {
+  return (
+    <svg {...base} width={13} height={13} strokeWidth={2.5}>
+      <path d="M4 6h16M4 12h16M4 18h9" />
+    </svg>
+  );
+}
+
 /** Two arrows chasing each other: swap this suggestion for another. */
 export function SwapIcon() {
   return (

@@ -25,6 +25,8 @@ function row(id: string, overrides: Partial<ListItem> = {}): ListItem {
     id,
     kind: 'task',
     title: id,
+    description: '',
+    subtasks: [],
     areaId: 'work',
     projectId: null,
     priority: false,

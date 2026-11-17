@@ -10,6 +10,7 @@ import { Today } from '../screens/Today';
 import { fullDayName } from '../ui/dates';
 import { EdgeMeter } from '../ui/EdgeMeter';
 import { AreasIcon, InboxIcon, PlusIcon, SettingsIcon, TodayIcon } from '../ui/icons';
+import { ItemSheet } from '../ui/ItemSheet';
 import { useFullHeight } from './fullHeight';
 import { useActions } from './store';
 import { useView } from './view';
@@ -76,6 +77,10 @@ function Shell({ saving }: Props) {
   const areaIndex = areas.findIndex((area) => area.id === areaId);
   const paging = tab === 'areas' && areaIndex >= 0;
   const [undo, setUndo] = useState<{ completionId: ID; title: string } | null>(null);
+  // The item whose panel is open. It is found afresh each time, so the panel stays open while
+  // the item moves to another list or turns from a task into a routine.
+  const [editingId, setEditingId] = useState<ID | null>(null);
+  const editing = editingId === null ? undefined : view.items.find((item) => item.id === editingId);
   const captureRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   useFullHeight(frameRef);
@@ -87,8 +92,17 @@ function Shell({ saving }: Props) {
     return () => window.clearTimeout(timer);
   }, [undo]);
 
+  // An item that has gone, once deleted, closes its panel, which stays closed if it comes back.
+  useEffect(() => {
+    if (editingId !== null && editing === undefined) setEditingId(null);
+  }, [editingId, editing]);
+
   function complete(item: ListItem) {
     setUndo({ completionId: actions.complete(item), title: item.title });
+  }
+
+  function edit(item: ListItem) {
+    setEditingId(item.id);
   }
 
   function showTab(id: Tab) {
@@ -131,7 +145,8 @@ function Shell({ saving }: Props) {
       {/* HEAT runs round the edge of every screen, so no screen needs a bar of its own. */}
       <EdgeMeter heat={view.heat.heat} />
 
-      <header className="head">
+      {/* While a panel is open, nothing behind it takes a tap, a key or a screen reader's attention. */}
+      <header className="head" inert={editing !== undefined}>
         {paging ? (
           <AreaHeading
             areas={areas}
@@ -149,29 +164,56 @@ function Shell({ saving }: Props) {
         )}
       </header>
 
-      <main className={paging ? 'main is-paging' : 'main'} key={paging ? 'areas:pages' : tab}>
+      <main
+        className={paging ? 'main is-paging' : 'main'}
+        key={paging ? 'areas:pages' : tab}
+        inert={editing !== undefined}
+      >
         {!saving && (
           <p className="notice" role="status">
             Storage is not available here, so nothing will be kept on this device.
           </p>
         )}
-        {tab === 'today' && <Today view={view} onComplete={complete} day={day} onPickDay={setPickedDay} />}
+        {tab === 'today' && (
+          <Today view={view} onComplete={complete} onEdit={edit} day={day} onPickDay={setPickedDay} />
+        )}
         {tab === 'areas' && (
           <Areas
             view={view}
             onComplete={complete}
+            onEdit={edit}
             openAreaId={paging ? areaId : null}
             onOpen={openArea}
             editing={areaEditing}
             onEditing={setAreaEditing}
           />
         )}
-        {tab === 'inbox' && <Inbox view={view} onComplete={complete} captureRef={captureRef} />}
+        {tab === 'inbox' && <Inbox view={view} onComplete={complete} onEdit={edit} captureRef={captureRef} />}
         {tab === 'settings' && <Settings view={view} />}
       </main>
 
+      {editing && (
+        <ItemSheet
+          key={editing.id}
+          item={editing}
+          places={view.places}
+          today={view.today}
+          onClose={() => setEditingId(null)}
+          onUpdate={(patch) => actions.updateItem(editing, patch)}
+          onSetSchedule={(schedule) => actions.setSchedule(editing, schedule)}
+          onDelete={() => {
+            actions.deleteItem(editing);
+            setEditingId(null);
+          }}
+          onAddSubtask={(title) => actions.addSubtask(editing, title)}
+          onRenameSubtask={(id, title) => actions.renameSubtask(editing, id, title)}
+          onDeleteSubtask={(id) => actions.deleteSubtask(editing, id)}
+          onToggleSubtask={(id) => actions.toggleSubtask(editing, id)}
+        />
+      )}
+
       {undo && (
-        <div className="toast" role="status">
+        <div className="toast" role="status" inert={editing !== undefined}>
           <span className="toast-text">Done: {undo.title}</span>
           <button
             type="button"
@@ -185,7 +227,7 @@ function Shell({ saving }: Props) {
         </div>
       )}
 
-      <nav className="tabs" aria-label="Sections">
+      <nav className="tabs" aria-label="Sections" inert={editing !== undefined}>
         {TABS.slice(0, TABS_BEFORE_PLUS).map(tabButton)}
         <button className="tabs-add" type="button" aria-label="Capture a task" onClick={capture}>
           <PlusIcon />

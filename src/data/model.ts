@@ -36,9 +36,28 @@ export function isClockTime(value: unknown): value is ClockTime {
   return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
+/**
+ * A step inside a task or a routine. It is part of its item, like a routine's days, not a
+ * record of its own: removing one takes it out of the list, and the item's `updatedAt` records
+ * the change. Ticking one is not a completion. It earns nothing, and nothing ever counts them.
+ */
+export interface Subtask {
+  id: ID;
+  title: string;
+  /**
+   * Null when it is not ticked. On a task, the day it was ticked, and any day means ticked. On a
+   * routine, the date it was ticked for: it shows ticked only while the routine is on that date,
+   * so a routine's subtasks clear by themselves when its next date opens.
+   */
+  checked: DayKey | null;
+}
+
 export interface Task extends Meta {
   title: string;
-  note?: string;
+  /** Plain text, '' for none. */
+  description: string;
+  /** In the order they were added. */
+  subtasks: Subtask[];
   /** Both null means the task is in the Inbox. */
   areaId: ID | null;
   projectId: ID | null;
@@ -57,6 +76,8 @@ export interface Task extends Meta {
 
 export interface Routine extends Meta {
   title: string;
+  description: string;
+  subtasks: Subtask[];
   areaId: ID;
   projectId: ID | null;
   priority: boolean;
@@ -171,8 +192,9 @@ export interface AppState {
  * gave tasks a date and a time and routines a time, made schedules weekly or monthly, and
  * replaced a completion's `scheduled` with the date it counted for. Version 7 made Friction a
  * number of stars, and took Priority off completions, since it no longer changes a reward.
+ * Version 8 gave tasks and routines a description and subtasks.
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const SEED_AREA_NAMES = ['Work', 'Health', 'Home', 'People', 'Growth'];
 

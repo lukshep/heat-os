@@ -13,6 +13,7 @@ These are requirements. Do not add features that break them, even as small helpe
 
 - HEAT is the only progress meter. It is the line of light round the edge of the screen (`src/ui/EdgeMeter.tsx`), present on every screen. No percentages, XP, currencies, achievements, badges or dashboards.
 - Never display streak counts, routine warmth or routine progress. Warmth is felt only through colour.
+- Subtasks earn nothing and are never counted: no "2 of 5", no bar, no colour. Ticking the last one does not complete the task; the ring is the only way.
 - No daily completion state and no daily pass or fail: no "all done", no threshold or goal line, no midnight reset of HEAT. The edge meter is the only signal. HEAT resets only when the person asks, from Settings.
 - Settings that change how HEAT behaves (Effort, Cooling, the reset) ask for confirmation before they act, and their steps have names, never numbers.
 - Surge (HEAT above 100) is shown only by the edge line itself. Do not name it in the product UI, record it, count it or reward it. The sweep round the edge when HEAT goes over 100 is the line itself, chosen on purpose; nothing beyond the line may mark the moment.
@@ -76,7 +77,9 @@ Import rules:
 - **Screens list `ListItem`s** (`src/data/selectors.ts`), one shape for tasks and routines. A task and the routine made from it share an id.
 - **Areas and projects are `Place`s**, flattened in reading order by `places()`. An item's area always matches its project's area; the reducer enforces it, and scoring only looks at the area.
 - **View preferences are not data.** Which sections are folded lives in localStorage (`src/app/collapsed.ts`), outside the state document and its backups.
-- **All records carry** `id`, `createdAt`, `updatedAt`, `deletedAt`. Delete by setting `deletedAt`.
+- **All records carry** `id`, `createdAt`, `updatedAt`, `deletedAt`. Delete by setting `deletedAt`. The one exception is a subtask, which is part of its item, like a routine's days: removing it takes it out of the list.
+- **Subtask ticks are item data, not completions.** They never reach the completion log or HEAT. A routine's ticks are for the date it is on (`routineDate`), so they clear when the next opens with nothing stored or reset.
+- **An item's panel** (`src/ui/ItemSheet.tsx`) is held by the shell, which finds the item by id each render. Rows open it through `onEdit`; nothing edits an item under its row any more.
 - **Changing the persisted shape** means bumping `SCHEMA_VERSION`, adding a step to `migrate` in `src/data/storage.ts`, and testing that step against a document of the old shape. People have data saved by earlier builds.
 - **The config in force** is `heatConfig(state.settings)`: the tuned defaults with the person's own day start, Effort and Cooling. HEAT itself is folded over `heatTimeline(state.settings)`, so a change of Effort or Cooling applies from the moment it is made and never rescores the past. Never read `DEFAULT_CONFIG` in `app/` or `screens/`.
 - **Engine changes need a test.** Unit tests use the round numbers in `src/heat/testConfig.ts`, never `DEFAULT_CONFIG`, so they do not move when the defaults are retuned.

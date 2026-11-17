@@ -13,6 +13,7 @@ import {
   type ID,
   type Routine,
   type Settings,
+  type Subtask,
   type Task,
 } from './model';
 
@@ -231,11 +232,48 @@ export function routineToday(routine: Routine, log: RoutineLog, today: DayKey): 
   return { occurrence: now.occurrence, due: now.due, done: false, todayId };
 }
 
+/**
+ * The date a routine is on now, which its subtasks are ticked for: the date that is open, or
+ * the one it was done for until the next opens. Before its first date, today.
+ */
+export function routineDate(routine: Routine, log: RoutineLog, today: DayKey): DayKey {
+  const now = occurrenceNow(routine.schedule, routine.warmthBase.asOf, log.kept, today);
+  return now.kind === 'waiting' ? today : now.occurrence;
+}
+
+/**
+ * Whether a subtask shows ticked. On a task, a tick on any day counts. On a routine, only a
+ * tick for `date`, the date the routine is on, so its subtasks clear when the next one opens.
+ */
+export function isTicked(checked: DayKey | null, date: DayKey | null): boolean {
+  return date === null ? checked !== null : checked === date;
+}
+
+/** A subtask as a row shows it. */
+export interface ListSubtask {
+  id: ID;
+  title: string;
+  done: boolean;
+}
+
+/** Subtasks as a row shows them. `date` is a routine's date (see `isTicked`), or null for a task. */
+function listSubtasks(subtasks: readonly Subtask[], date: DayKey | null): ListSubtask[] {
+  return subtasks.map((subtask) => ({
+    id: subtask.id,
+    title: subtask.title,
+    done: isTicked(subtask.checked, date),
+  }));
+}
+
 /** A task or a routine as the screens list it. Everything a row needs, in one shape. */
 export interface ListItem {
   id: ID;
   kind: 'task' | 'routine';
   title: string;
+  /** Plain text, '' for none. */
+  description: string;
+  /** In the order they were added, each ticked or not. A routine's ticks are for the date it is on. */
+  subtasks: ListSubtask[];
   areaId: ID | null;
   /** The project it sits in, or null for the top of its area. Never a project that no longer exists. */
   projectId: ID | null;
@@ -283,6 +321,8 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
       id: routine.id,
       kind: 'routine',
       title: routine.title,
+      description: routine.description,
+      subtasks: listSubtasks(routine.subtasks, routineDate(routine, log, today)),
       areaId: routine.areaId,
       projectId: projectOf(routine),
       priority: routine.priority,
@@ -303,6 +343,8 @@ export function listItems(state: AppState, today: DayKey, config: HeatConfig): L
     id: task.id,
     kind: 'task',
     title: task.title,
+    description: task.description,
+    subtasks: listSubtasks(task.subtasks, null),
     areaId: task.areaId,
     projectId: projectOf(task),
     priority: task.priority,
@@ -394,7 +436,8 @@ function timedFirst(items: readonly ListItem[], dayStartHour: number): ListItem[
 /**
  * What a later day holds: the tasks planned for it and the routines due on it, Priority first,
  * then timed ones, then routines, then tasks. A routine's row speaks for that day's date: done if it was
- * done early, open if it has opened early, and otherwise not open yet (`occurrence` null).
+ * done early, open if it has opened early, and otherwise not open yet (`occurrence` null). So
+ * do its subtasks: only ticks for that date show.
  */
 export function dayList(state: AppState, items: readonly ListItem[], day: DayKey, dayStartHour: number): ListItem[] {
   const logs = routineLogs(state);
@@ -409,7 +452,8 @@ export function dayList(state: AppState, items: readonly ListItem[], day: DayKey
     // Today's completion can be taken back here only if it was for this day.
     const undoId = item.undoId !== null && state.completions[item.undoId]?.occurrence === day ? item.undoId : null;
     const occurrence = !done && item.occurrence === day ? day : null;
-    rows.push({ ...item, due: false, done, undoId, occurrence });
+    const subtasks = listSubtasks(state.routines[item.id]?.subtasks ?? [], day);
+    rows.push({ ...item, due: false, done, undoId, occurrence, subtasks });
   }
   return priorityFirst(timedFirst(rows, dayStartHour));
 }

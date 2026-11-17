@@ -11,6 +11,8 @@ import { ItemList } from './ItemList';
 interface Props {
   view: View;
   onComplete: (item: ListItem) => void;
+  /** Opens an item's panel. */
+  onEdit: (item: ListItem) => void;
   /** The area whose page is open, or null for the overview. */
   openAreaId: ID | null;
   /** Opens an area's page, or the overview for null. */
@@ -168,7 +170,17 @@ interface PageProps extends Props {
  * One area: a field for adding a task to it and a way to start a project, then its own
  * routines and tasks, then each of its projects as a section that folds shut.
  */
-function AreaPage({ area, view, onComplete, editing, onEditing, current, collapsed, setCollapsed }: PageProps) {
+function AreaPage({
+  area,
+  view,
+  onComplete,
+  onEdit,
+  editing,
+  onEditing,
+  current,
+  collapsed,
+  setCollapsed,
+}: PageProps) {
   const actions = useActions();
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -205,7 +217,7 @@ function AreaPage({ area, view, onComplete, editing, onEditing, current, collaps
         />
       )}
 
-      <ItemList items={itemsAt(view.items, area)} view={view} onComplete={onComplete} routinesStay />
+      <ItemList items={itemsAt(view.items, area)} view={view} onComplete={onComplete} onEdit={onEdit} routinesStay />
 
       {projects.map((place) => (
         <PlaceSection
@@ -213,6 +225,7 @@ function AreaPage({ area, view, onComplete, editing, onEditing, current, collaps
           place={place}
           view={view}
           onComplete={onComplete}
+          onEditItem={onEdit}
           folded={collapsed.has(place.id)}
           onFold={(folded) => setCollapsed(place.id, folded)}
           editing={editingKey === place.key}
@@ -275,6 +288,8 @@ interface SectionProps {
   place: Place;
   view: View;
   onComplete: (item: ListItem) => void;
+  /** Opens an item's panel. `onEdit` is the section's own rename panel. */
+  onEditItem: (item: ListItem) => void;
   folded: boolean;
   onFold: (folded: boolean) => void;
   editing: boolean;
@@ -339,7 +354,7 @@ function PlaceSection(props: SectionProps) {
 
       {!folded && (
         <>
-          <ItemList items={items} view={view} onComplete={props.onComplete} routinesStay />
+          <ItemList items={items} view={view} onComplete={props.onComplete} onEdit={props.onEditItem} routinesStay />
           {adding && (
             <AddInput
               autoFocus

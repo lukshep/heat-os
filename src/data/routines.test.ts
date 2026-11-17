@@ -4,7 +4,7 @@ import { LAST_DAY, type Schedule } from '../heat/schedule';
 import { TEST_CONFIG as config } from '../heat/testConfig';
 import { createInitialState, type AppState, type ID } from './model';
 import { reduce, type Action } from './reducer';
-import { inArea, liveAreas, liveCompletions, listItems, openTasks, type ListItem } from './selectors';
+import { dayList, inArea, liveAreas, liveCompletions, listItems, openTasks, type ListItem } from './selectors';
 import { parseState } from './storage';
 
 // 4 January 2026 is a Sunday.
@@ -336,6 +336,105 @@ describe('going back to a one-off task', () => {
     const gone = run(state, { type: 'area/delete', id: health, at: 6000 });
     const inbox = inArea(listItems(gone, MONDAY, config), null);
     expect(inbox).toEqual([expect.objectContaining({ id: 'run', kind: 'task', title: 'Run' })]);
+  });
+});
+
+describe('subtasks on a routine', () => {
+  const tick = (id: ID, checked: DayKey | null, at = 5000): Action => ({
+    type: 'subtask/check',
+    itemId: 'run',
+    id,
+    at,
+    checked,
+  });
+
+  /** "Run" on Mondays and Thursdays with two subtasks, the first ticked for `ticked` if given. */
+  function withSteps(ticked: DayKey | null = null): AppState {
+    const { state } = withRoutine(week(MON_THU));
+    return run(
+      state,
+      { type: 'subtask/add', itemId: 'run', id: 's1', at: 4000, title: 'Stretch' },
+      { type: 'subtask/add', itemId: 'run', id: 's2', at: 4100, title: 'Shoes' },
+      ...(ticked === null ? [] : [tick('s1', ticked)]),
+    );
+  }
+
+  const ticks = (state: AppState, today: DayKey) => routineOn(state, today).subtasks.map((subtask) => subtask.done);
+
+  it('come with a task made a routine, with its description, unticked, and go back with it', () => {
+    const start = createInitialState(1000, newId);
+    const health = areaId(start, 'Health');
+    const made = run(
+      start,
+      { type: 'task/add', id: 'run', at: 2000, title: 'Run', areaId: health },
+      { type: 'task/update', id: 'run', at: 2050, patch: { description: 'Easy pace' } },
+      { type: 'subtask/add', itemId: 'run', id: 's1', at: 2060, title: 'Stretch' },
+      { type: 'subtask/check', itemId: 'run', id: 's1', at: 2070, checked: MONDAY },
+      { type: 'task/makeRoutine', id: 'run', at: 2100, schedule: week(EVERY_DAY), asOf: SUNDAY },
+    );
+    expect(made.routines.run).toMatchObject({
+      description: 'Easy pace',
+      subtasks: [{ id: 's1', title: 'Stretch', checked: null }],
+    });
+
+    const back = run(made, tick('s1', MONDAY), { type: 'routine/makeTask', id: 'run', at: 6000 });
+    expect(back.tasks.run).toMatchObject({
+      description: 'Easy pace',
+      subtasks: [{ id: 's1', title: 'Stretch', checked: null }],
+    });
+  });
+
+  it('take a description like a task does', () => {
+    const state = run(withSteps(), {
+      type: 'routine/update',
+      id: 'run',
+      at: 5000,
+      patch: { description: ' Easy pace ' },
+    });
+    expect(routineOn(state, MONDAY).description).toBe('Easy pace');
+  });
+
+  it('are ticked for the date the routine is on, and clear when the next date opens', () => {
+    const state = withSteps(MONDAY);
+    expect(ticks(state, MONDAY)).toEqual([true, false]);
+    // Monday's date stays open until Thursday, and so do its ticks.
+    expect(ticks(state, WEDNESDAY)).toEqual([true, false]);
+    expect(ticks(state, THURSDAY)).toEqual([false, false]);
+  });
+
+  it('stay ticked while the routine is done, until its next date', () => {
+    const state = run(withSteps(MONDAY), complete('c1', MONDAY));
+    expect(routineOn(state, TUESDAY).done).toBe(true);
+    expect(ticks(state, TUESDAY)).toEqual([true, false]);
+    expect(ticks(state, THURSDAY)).toEqual([false, false]);
+  });
+
+  it('are ticked for today before the first date', () => {
+    const { state } = withRoutine(week([4]));
+    const ticked = run(
+      state,
+      { type: 'subtask/add', itemId: 'run', id: 's1', at: 4000, title: 'Stretch' },
+      tick('s1', MONDAY),
+    );
+    expect(routineOn(ticked, MONDAY).occurrence).toBeNull();
+    expect(ticks(ticked, MONDAY)).toEqual([true]);
+    expect(ticks(ticked, TUESDAY)).toEqual([false]);
+  });
+
+  it('show on a later day only the ticks made for that date', () => {
+    const state = withSteps(MONDAY);
+    const [thursday] = dayList(state, listItems(state, MONDAY, config), THURSDAY, config.dayStartHour);
+    expect(thursday?.subtasks.map((subtask) => subtask.done)).toEqual([false, false]);
+
+    const early = run(state, tick('s2', THURSDAY));
+    const [later] = dayList(early, listItems(early, MONDAY, config), THURSDAY, config.dayStartHour);
+    expect(later?.subtasks.map((subtask) => subtask.done)).toEqual([false, true]);
+  });
+
+  it('are not completions: ticking them logs nothing and the date stays due', () => {
+    const state = withSteps(MONDAY);
+    expect(liveCompletions(state)).toEqual([]);
+    expect(routineOn(state, MONDAY).due).toBe(true);
   });
 });
 

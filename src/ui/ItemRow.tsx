@@ -1,23 +1,30 @@
-import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
-import type { ItemPatch } from '../data/reducer';
-import type { ListItem, Place } from '../data/selectors';
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
+import type { ID } from '../data/model';
+import type { ListItem } from '../data/selectors';
 import { FRICTION_STARS } from '../heat/config';
-import { addDays, isDayKey, type DayKey } from '../heat/day';
-import { DAILY, isDaily, LAST_DAY, type Schedule } from '../heat/schedule';
-import { dayName, describeWhen } from './dates';
-import { CheckIcon, StarIcon } from './icons';
+import type { DayKey } from '../heat/day';
+import { describeWhen } from './dates';
+import { CheckIcon, DetailsIcon } from './icons';
 import { heatColor } from './temperature';
-import { describeSchedule, monthDayName, weekdayName, weekdayOrder } from './weekdays';
+import { describeSchedule } from './weekdays';
 
 interface Props {
   item: ListItem;
   /** 0 (cold) to SURGE_PEAK (hottest): how many points completing it would earn right now, whatever HEAT is. */
   temperature: number;
-  /** Every area and project, for choosing where the item lives. */
-  places: readonly Place[];
   today: DayKey;
   /** The day the list is for, if it is for one. A row planned for it shows only its time. */
   listDay?: DayKey | undefined;
+  /** Its description and subtasks are showing. Only a row that has some can open. */
   open: boolean;
   /** The row stays in its list once completed, so it must not fold away. True for a routine outside Today. */
   stays: boolean;
@@ -29,10 +36,9 @@ interface Props {
   onComplete: () => void;
   /** Takes back today's completion of a routine that is shown as done. */
   onUndo: () => void;
-  onUpdate: (patch: ItemPatch) => void;
-  /** Sets how it repeats. Any days make it a routine; none make it a one-off task. */
-  onSetSchedule: (schedule: Schedule) => void;
-  onDelete: () => void;
+  /** Opens the item's panel. */
+  onEdit: () => void;
+  onToggleSubtask: (subtaskId: ID) => void;
   /** Where the item lives, shown on screens that mix areas. */
   context?: string | undefined;
   trailing?: ReactNode;
@@ -53,6 +59,8 @@ export function ItemRow(props: Props) {
   const { done } = item;
   // Only a completion made today can be taken back from the row.
   const undoable = item.undoId !== null;
+  const hasDetails = item.description !== '' || item.subtasks.length > 0;
+  const press = useLongPress(props.onEdit);
 
   function complete() {
     if (leaving) return;
@@ -67,6 +75,11 @@ export function ItemRow(props: Props) {
     item.repeat && describeSchedule(item.repeat),
     describeWhen(item.date, item.time, props.today, props.listDay),
     item.friction > 0 && <Stars stars={item.friction} />,
+    hasDetails && (
+      <span className="row-has-details" role="img" aria-label="Has details">
+        <DetailsIcon />
+      </span>
+    ),
   ].filter(Boolean);
 
   const waiting = !done && props.waiting === true;
@@ -97,7 +110,15 @@ export function ItemRow(props: Props) {
           >
             <span className="row-check-ring">{done && <CheckIcon />}</span>
           </button>
-          <button className="row-title" type="button" aria-expanded={open} onClick={props.onToggle}>
+          {/* A tap shows the details, or opens the panel when there are none. A long press always opens it. */}
+          <button
+            className="row-title"
+            type="button"
+            aria-expanded={hasDetails ? open : undefined}
+            aria-haspopup={hasDetails ? undefined : 'dialog'}
+            onClick={hasDetails ? props.onToggle : props.onEdit}
+            {...press}
+          >
             <span className="row-title-text">
               {item.priority && <span className="visually-hidden">Priority: </span>}
               {item.title}
@@ -115,17 +136,123 @@ export function ItemRow(props: Props) {
           </button>
           {props.trailing}
         </div>
-        {open && <Editor {...props} />}
+        {open && hasDetails && (
+          <Details item={item} waiting={waiting} onEdit={props.onEdit} onToggleSubtask={props.onToggleSubtask} />
+        )}
       </div>
     </li>
   );
+}
+
+/**
+ * What opens under a row: its description, its subtasks to tick, and the way into its panel.
+ * Subtasks are grey and earn nothing; a routine's are ticked for the date it is on.
+ */
+function Details({
+  item,
+  waiting,
+  onEdit,
+  onToggleSubtask,
+}: Pick<Props, 'item' | 'onEdit' | 'onToggleSubtask'> & { waiting: boolean }) {
+  return (
+    <div className="details">
+      {item.description !== '' && <p className="details-text">{item.description}</p>}
+      {item.subtasks.length > 0 && (
+        <ul className="details-subtasks">
+          {item.subtasks.map((subtask) => (
+            <li key={subtask.id}>
+              <button
+                className="details-subtask"
+                type="button"
+                role="checkbox"
+                aria-checked={subtask.done}
+                // A routine whose date has not opened cannot be done yet, and neither can its steps.
+                disabled={waiting}
+                onClick={() => onToggleSubtask(subtask.id)}
+              >
+                <span className="subtask-box">{subtask.done && <CheckIcon />}</span>
+                <span className="details-subtask-title">{subtask.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button className="text-button details-edit" type="button" onClick={onEdit}>
+        Edit
+      </button>
+    </div>
+  );
+}
+
+/** How long a press on a row has to last to open its panel. */
+const LONG_PRESS_MS = 500;
+/** How far a press can drift, in CSS pixels, before it counts as the start of a scroll. */
+const PRESS_SLOP = 10;
+/** How soon after a long press ends a click is taken as its own, and ignored. */
+const CLICK_AFTER_PRESS_MS = 600;
+
+/**
+ * Opens the panel on a long press, or on a right click with a mouse. Moving the finger, or the
+ * list starting to scroll, cancels the press, so scrolling and swiping between areas are left
+ * alone. The click that ends a long press does nothing more.
+ */
+function useLongPress(onLongPress: () => void) {
+  const latest = useRef(onLongPress);
+  latest.current = onLongPress;
+  const pending = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const fired = useRef(false);
+  const ignoreClicksUntil = useRef(0);
+
+  function cancel() {
+    if (pending.current === null) return;
+    window.clearTimeout(pending.current.timer);
+    pending.current = null;
+  }
+
+  function fire() {
+    cancel();
+    fired.current = true;
+    latest.current();
+  }
+
+  useEffect(() => cancel, []);
+
+  return {
+    onPointerDown(event: PointerEvent) {
+      cancel();
+      fired.current = false;
+      if (event.button !== 0) return;
+      pending.current = { timer: window.setTimeout(fire, LONG_PRESS_MS), x: event.clientX, y: event.clientY };
+    },
+    onPointerMove(event: PointerEvent) {
+      const start = pending.current;
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > PRESS_SLOP) cancel();
+    },
+    onPointerUp() {
+      cancel();
+      if (fired.current) ignoreClicksUntil.current = performance.now() + CLICK_AFTER_PRESS_MS;
+    },
+    onPointerCancel: cancel,
+    onPointerLeave: cancel,
+    onClickCapture(event: MouseEvent) {
+      if (performance.now() >= ignoreClicksUntil.current) return;
+      ignoreClicksUntil.current = 0;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    // A phone's own long-press menu, or a right click: the panel instead.
+    onContextMenu(event: MouseEvent) {
+      event.preventDefault();
+      if (!fired.current) fire();
+    },
+  };
 }
 
 /** A row's stars of Friction, filled ones only. A screen reader hears how many of how many. */
 function Stars({ stars }: { stars: number }) {
   return (
     <span className="row-stars" role="img" aria-label={`Friction, ${stars} of ${FRICTION_STARS} stars`}>
-      {'\u2605'.repeat(stars)}
+      {'★'.repeat(stars)}
     </span>
   );
 }
@@ -134,294 +261,4 @@ function Stars({ stars }: { stars: number }) {
 function checkLabel(title: string, done: boolean, undoable: boolean, waiting: boolean): string {
   if (done) return undoable ? `Undo: ${title}` : `Done: ${title}`;
   return waiting ? `Not open yet: ${title}` : `Complete: ${title}`;
-}
-
-const INBOX = 'inbox';
-
-/**
- * The days the monthly picker offers before Last day. The 31st is left out: a day a month lacks
- * falls on its last day, so the 31st and Last day are the same thing.
- */
-const MONTH_DAYS = Array.from({ length: LAST_DAY - 1 }, (_, index) => index + 1);
-
-/** Which repeat picker is showing: Daily has no days to choose, so it is a picker of its own. */
-type Repeat = 'day' | Schedule['every'];
-
-/** The picker that shows how an item repeats now. A one-off task starts on Weekly, one tap from a routine. */
-function repeatOf(schedule: Schedule | null): Repeat {
-  if (schedule === null) return 'week';
-  return isDaily(schedule) ? 'day' : schedule.every;
-}
-
-/** The value of the "Keep it in" picker that stands for where the item is now. */
-function homeKey(item: ListItem): string {
-  if (item.areaId === null) return INBOX;
-  return item.projectId === null ? `area:${item.areaId}` : `project:${item.projectId}`;
-}
-
-function Editor({ item, places, today, onUpdate, onSetSchedule, onDelete }: Props) {
-  const [title, setTitle] = useState(item.title);
-  // Which picker is showing. Daily applies at once; Weekly and Monthly change nothing until a day is chosen.
-  const [every, setEvery] = useState<Repeat>(() => repeatOf(item.repeat));
-  const chosen = item.repeat?.every === every ? item.repeat.days : [];
-
-  function commitTitle() {
-    const next = title.trim();
-    if (next && next !== item.title) onUpdate({ title: next });
-    else setTitle(item.title);
-  }
-
-  /** The first day chosen makes it a routine, and clearing the last makes it a one-off task. */
-  function toggleDay(every: Schedule['every'], day: number) {
-    const days = chosen.includes(day) ? chosen.filter((other) => other !== day) : [...chosen, day];
-    onSetSchedule({ every, days });
-  }
-
-  function repeatDaily() {
-    setEvery('day');
-    if (item.repeat === null || !isDaily(item.repeat)) onSetSchedule(DAILY);
-  }
-
-  /** Makes it a one-off task again, without unticking each of its days. */
-  function stopRepeating() {
-    if (item.repeat === null) return;
-    setEvery('week');
-    onSetSchedule({ every: item.repeat.every, days: [] });
-  }
-
-  return (
-    <div className="editor">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          // Leaving the field is what saves, so Return and tapping away behave the same.
-          event.currentTarget.querySelector('input')?.blur();
-        }}
-      >
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={commitTitle}
-          aria-label="Title"
-          enterKeyHint="done"
-          autoComplete="off"
-        />
-      </form>
-
-      <div className="tags">
-        <Chip pressed={item.priority} onClick={() => onUpdate({ priority: !item.priority })}>
-          Priority
-        </Chip>
-        <FrictionPicker stars={item.friction} onChange={(friction) => onUpdate({ friction })} />
-      </div>
-
-      <When item={item} today={today} onUpdate={onUpdate} />
-
-      <label>
-        <div className="editor-label">Keep it in</div>
-        {/* A native picker: it copes with any number of areas and projects, at any depth. */}
-        <select
-          value={homeKey(item)}
-          onChange={(event) => {
-            const place = places.find((candidate) => candidate.key === event.target.value);
-            onUpdate(place ? { areaId: place.areaId, projectId: place.projectId } : { areaId: null, projectId: null });
-          }}
-        >
-          {/* A routine needs a home, so only a one-off task can go back to the Inbox. */}
-          {item.kind === 'task' && <option value={INBOX}>Inbox</option>}
-          {places.map((place) => (
-            <option key={place.key} value={place.key}>
-              {place.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div>
-        <div className="editor-label">Repeat</div>
-        {item.areaId === null ? (
-          <p className="editor-hint">File it under an area first, then it can repeat.</p>
-        ) : (
-          <div className="repeat">
-            <div className="chips" role="group" aria-label="How often">
-              <Chip pressed={every === 'day'} onClick={repeatDaily}>
-                Daily
-              </Chip>
-              <Chip pressed={every === 'week'} onClick={() => setEvery('week')}>
-                Weekly
-              </Chip>
-              <Chip pressed={every === 'month'} onClick={() => setEvery('month')}>
-                Monthly
-              </Chip>
-            </div>
-            {every === 'week' && (
-              <div className="chips" role="group" aria-label="Repeat on weekdays">
-                {weekdayOrder().map((day) => (
-                  <Chip key={day} pressed={chosen.includes(day)} onClick={() => toggleDay('week', day)}>
-                    {weekdayName(day)}
-                  </Chip>
-                ))}
-              </div>
-            )}
-            {every === 'month' && (
-              <div className="month-days" role="group" aria-label="Repeat on days of the month">
-                {MONTH_DAYS.map((day) => (
-                  <Chip
-                    key={day}
-                    pressed={chosen.includes(day)}
-                    onClick={() => toggleDay('month', day)}
-                    label={monthDayName(day)}
-                  >
-                    {day}
-                  </Chip>
-                ))}
-                <Chip pressed={chosen.includes(LAST_DAY)} onClick={() => toggleDay('month', LAST_DAY)} wide>
-                  {monthDayName(LAST_DAY)}
-                </Chip>
-              </div>
-            )}
-            {item.repeat !== null && (
-              <button className="text-button" type="button" onClick={stopRepeating}>
-                Stop repeating
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      <button className="text-button is-danger" type="button" onClick={onDelete}>
-        Delete {item.kind}
-      </button>
-    </div>
-  );
-}
-
-/**
- * Up to five stars for how hard an item is to start. Tapping a star sets that many, and tapping
- * the last lit star again clears them all.
- */
-function FrictionPicker({ stars, onChange }: { stars: number; onChange: (stars: number) => void }) {
-  return (
-    <div className="friction" role="group" aria-label="Friction">
-      <span className="friction-name" aria-hidden="true">
-        Friction
-      </span>
-      {Array.from({ length: FRICTION_STARS }, (_, index) => {
-        const value = index + 1;
-        return (
-          <button
-            key={value}
-            className="friction-star"
-            type="button"
-            aria-pressed={value <= stars}
-            aria-label={value === 1 ? '1 star' : `${value} stars`}
-            onClick={() => onChange(value === stars ? 0 : value)}
-          >
-            <StarIcon />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * A task's planned day and a time on it, or a routine's time. A planned day is not a deadline:
- * once it passes, the task waits on Today. A task's time only shows once it has a day.
- */
-function When({ item, today, onUpdate }: Pick<Props, 'item' | 'today' | 'onUpdate'>) {
-  const tomorrow = addDays(today, 1);
-  const picked = item.date !== null && item.date !== today && item.date !== tomorrow ? item.date : null;
-
-  return (
-    <>
-      {item.kind === 'task' && (
-        <div>
-          <div className="editor-label">When</div>
-          <div className="chips" role="group" aria-label="When">
-            <Chip pressed={item.date === today} onClick={() => onUpdate({ date: today })}>
-              Today
-            </Chip>
-            <Chip pressed={item.date === tomorrow} onClick={() => onUpdate({ date: tomorrow })}>
-              Tomorrow
-            </Chip>
-            {/* The device's own date picker, laid over the chip so a tap on the chip opens it. */}
-            <label className={picked ? 'chip chip-pick is-on' : 'chip chip-pick'}>
-              {picked ? dayName(picked, today) : 'Pick'}
-              <input
-                type="date"
-                aria-label="Pick a day"
-                value={item.date ?? ''}
-                min={today}
-                onClick={(event) => openPicker(event.currentTarget)}
-                onChange={(event) => {
-                  const { value } = event.target;
-                  if (value === '') onUpdate({ date: null });
-                  else if (isDayKey(value)) onUpdate({ date: value });
-                }}
-              />
-            </label>
-            <Chip pressed={item.date === null} onClick={() => onUpdate({ date: null })}>
-              None
-            </Chip>
-          </div>
-        </div>
-      )}
-
-      {(item.kind === 'routine' || item.date !== null) && (
-        <div>
-          <div className="editor-label">Time</div>
-          <div className="time-row">
-            <input
-              type="time"
-              aria-label="Time"
-              value={item.time ?? ''}
-              onChange={(event) => onUpdate({ time: event.target.value === '' ? null : event.target.value })}
-            />
-            {item.time !== null && (
-              <button className="text-button" type="button" onClick={() => onUpdate({ time: null })}>
-                No time
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-/**
- * Opens a date field's picker. A phone opens it on a tap anyway; a desktop browser only does
- * from its small calendar button, so a click anywhere on the chip asks for it.
- */
-function openPicker(input: HTMLInputElement): void {
-  try {
-    input.showPicker();
-  } catch {
-    // Already open, or not allowed here: the field still works by hand.
-  }
-}
-
-interface ChipProps {
-  pressed: boolean;
-  onClick: () => void;
-  children: ReactNode;
-  /** A spoken name, for a chip whose text alone says too little, such as a bare day number. */
-  label?: string;
-  /** Takes a whole row of a grid. */
-  wide?: boolean;
-}
-
-function Chip(props: ChipProps) {
-  return (
-    <button
-      className={props.wide ? 'chip is-wide' : 'chip'}
-      type="button"
-      aria-pressed={props.pressed}
-      aria-label={props.label}
-      onClick={props.onClick}
-    >
-      {props.children}
-    </button>
-  );
 }

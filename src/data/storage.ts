@@ -79,6 +79,11 @@ const isSchedule = (value: unknown) =>
   (value.every === 'week' || value.every === 'month') &&
   Array.isArray(value.days) &&
   value.days.every(isNumber);
+const isSubtasks = (value: unknown) =>
+  Array.isArray(value) &&
+  value.every(
+    (subtask) => isDict(subtask) && isString(subtask.id) && isString(subtask.title) && isDayKeyOrNull(subtask.checked),
+  );
 
 type Check = (value: unknown) => boolean;
 
@@ -95,6 +100,8 @@ const SHAPES: Record<string, Record<string, Check>> = {
   tasks: {
     ...META,
     title: isString,
+    description: isString,
+    subtasks: isSubtasks,
     areaId: isStringOrNull,
     projectId: isStringOrNull,
     priority: isBoolean,
@@ -105,6 +112,8 @@ const SHAPES: Record<string, Record<string, Check>> = {
   routines: {
     ...META,
     title: isString,
+    description: isString,
+    subtasks: isSubtasks,
     areaId: isString,
     projectId: isStringOrNull,
     priority: isBoolean,
@@ -213,6 +222,22 @@ function migrate(raw: Dict): Dict | null {
         ...rest,
         friction: starsFor(friction, priority),
       })),
+    };
+  }
+
+  // Version 8 gave tasks and routines a description and subtasks. A task could carry a `note`
+  // that nothing wrote; if one is there, it becomes the description.
+  if (document.schemaVersion === 7) {
+    const withDetails = ({ note, ...rest }: Dict): Dict => ({
+      ...rest,
+      description: typeof note === 'string' ? note : '',
+      subtasks: [],
+    });
+    document = {
+      ...document,
+      schemaVersion: 8,
+      tasks: eachRecord(document.tasks, withDetails),
+      routines: eachRecord(document.routines, withDetails),
     };
   }
 
