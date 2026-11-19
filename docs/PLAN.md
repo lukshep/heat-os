@@ -32,7 +32,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M21 | The gradient along the edge line, and a Surge sweep | Deployed 2026-11-15; not yet tried on an iPhone |
 | M22 | Task details: a description, subtasks and a panel | Deployed 2026-11-16; not yet tried on an iPhone |
 | M23 | A steel gradient | Deployed 2026-11-18; replaced by M24 |
-| M24 | A thermal camera's gradient, and an icon to match | Built 2026-11-19; not yet deployed |
+| M24 | A thermal camera's gradient, and an icon to match | Deployed 2026-11-19; not yet tried on an iPhone |
 
 The first prototype is M1–M3.
 
