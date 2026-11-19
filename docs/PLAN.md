@@ -31,6 +31,7 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M20 | Retune: an even area ladder, stronger stars, rings up to the Surge peak | Deployed 2026-11-15; not yet tried on an iPhone |
 | M21 | The gradient along the edge line, and a Surge sweep | Deployed 2026-11-15; not yet tried on an iPhone |
 | M22 | Task details: a description, subtasks and a panel | Deployed 2026-11-16; not yet tried on an iPhone |
+| M23 | A steel gradient | Built 2026-11-18; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -514,6 +515,17 @@ Open after this pass:
 2. **The long press on an iPhone**: whether 500 ms feels right, and whether iOS still selects text or shows its menu.
 3. **Subtasks cannot be reordered** or turned into tasks.
 
+### M23 — A steel gradient
+
+Asked for on 2026-11-18, and chosen from a mockup of Today beside the old gradient: the temperature colours should follow steel being heated, from a cool grey to a bright pale yellow, rather than going through purple and pink (decision 61). Only the colour stops in `src/ui/temperature.ts` changed. No change to saved data, scoring or `DEFAULT_CONFIG`, so there is no tuning-log entry.
+
+- **The stops.** Cold blue-grey (0), plain grey (0.16), a dull red glow (0.34), cherry (0.55), orange (0.72), lemon (0.86), bright yellow at a full gauge, and a pale white-hot yellow at the Surge peak. Full and the peak are much as before.
+- **No violet on the way.** Blue-grey cannot turn red without passing through violet, so the cold end fades to grey, with no chroma, and the red grows out of it. Either side of a grey stop the hue is the one at the other end (`hueBetween`), so the hue changes only where it cannot be seen.
+- **In gamut.** Every colour fits sRGB; the peak's chroma is 0.055 so the palest yellow is not clipped.
+- **What it costs.** Three hue families instead of four, so mid-range rings sit closer together: a plain first task (0.64) is red turning orange, a second in its area (0.58) cherry. Cool items are a quieter red than the old violet.
+
+Verified: unit tests for `heatColor` (blue-grey at the cold end; every colour either nearly grey or between red and yellow; lighter all the way from the red glow up; paler beyond a full gauge; held at both ends). Not tried on an iPhone, where the thing to judge is whether the cool reds still read against the dark background.
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications, reordering areas, reordering subtasks.
@@ -582,6 +594,7 @@ Cloud sync, routine pause, notifications, reordering areas, reordering subtasks.
 | 58 | An item's settings live in a panel that rises from the bottom, not under its row | Decided 2026-11-16 |
 | 59 | A routine's subtask ticks belong to the date it is on and clear by themselves when the next opens | Decided 2026-11-16 |
 | 60 | Subtasks live inside their item, like a routine's days, not as records with their own `createdAt`, `updatedAt` and `deletedAt` | Decided 2026-11-16 |
+| 61 | The temperature gradient follows heated steel: blue-grey, grey, dull red, cherry, orange, lemon, yellow, white-hot. It never passes through violet or pink | Decided 2026-11-18; replaces the slate, violet and red gradient |
 
 ## Tuning log
 

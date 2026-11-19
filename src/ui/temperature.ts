@@ -14,18 +14,25 @@ const FULL = 1;
 export const SURGE_PEAK = 1.2;
 
 /**
- * The temperature gradient, in OKLCH so the steps look even. It runs from a muted slate
- * through violet and red to a bright yellow at a full gauge, and gets more vivid as it gets
- * hotter. Beyond full it pales towards white-hot, which only the edge meter in Surge ever
- * shows. Hue keeps climbing past 360 so the path never doubles back through green.
+ * The temperature gradient, in OKLCH so the steps look even. It follows steel as it is heated:
+ * cold blue-grey, a dull red glow, cherry, orange and lemon, to a bright yellow at a full gauge.
+ * Beyond full it pales towards white-hot, which only the edge meter in Surge and the hottest
+ * rings ever show.
+ *
+ * Blue-grey cannot turn red without passing through violet, so the cold end fades to plain grey
+ * first, where hue cannot be seen, and the red grows out of the grey. Every colour stays inside
+ * the sRGB gamut, so no screen clips it.
  */
 const STOPS: readonly Stop[] = [
-  { at: 0, lightness: 0.5, chroma: 0.04, hue: 255 },
-  { at: 0.3, lightness: 0.56, chroma: 0.11, hue: 300 },
-  { at: 0.55, lightness: 0.64, chroma: 0.18, hue: 380 },
-  { at: 0.8, lightness: 0.75, chroma: 0.17, hue: 415 },
-  { at: FULL, lightness: 0.89, chroma: 0.14, hue: 450 },
-  { at: SURGE_PEAK, lightness: 0.975, chroma: 0.07, hue: 462 },
+  { at: 0, lightness: 0.52, chroma: 0.022, hue: 250 },
+  // Plain grey: no chroma, so its hue is never used.
+  { at: 0.16, lightness: 0.47, chroma: 0, hue: 0 },
+  { at: 0.34, lightness: 0.47, chroma: 0.12, hue: 25 },
+  { at: 0.55, lightness: 0.57, chroma: 0.19, hue: 29 },
+  { at: 0.72, lightness: 0.67, chroma: 0.185, hue: 44 },
+  { at: 0.86, lightness: 0.78, chroma: 0.165, hue: 66 },
+  { at: FULL, lightness: 0.89, chroma: 0.15, hue: 92 },
+  { at: SURGE_PEAK, lightness: 0.975, chroma: 0.055, hue: 100 },
 ];
 
 function clamp(value: number, max: number): number {
@@ -34,6 +41,13 @@ function clamp(value: number, max: number): number {
 
 function mix(from: number, to: number, share: number): number {
   return from + (to - from) * share;
+}
+
+/** A grey stop has no hue, so the stretch either side of it keeps the hue of its other end. */
+function hueBetween(from: Stop, to: Stop, share: number): number {
+  if (from.chroma === 0) return to.hue;
+  if (to.chroma === 0) return from.hue;
+  return mix(from.hue, to.hue, share);
 }
 
 /** The colour for a temperature from 0 (cold) through 1 (a full gauge) to the peak of Surge. */
@@ -46,10 +60,10 @@ export function heatColor(temperature: number): string {
     const share = (t - from.at) / (to.at - from.at);
     const lightness = mix(from.lightness, to.lightness, share).toFixed(3);
     const chroma = mix(from.chroma, to.chroma, share).toFixed(3);
-    const hue = (mix(from.hue, to.hue, share) % 360).toFixed(1);
+    const hue = hueBetween(from, to, share).toFixed(1);
     return `oklch(${lightness} ${chroma} ${hue})`;
   }
-  return 'oklch(0.975 0.07 102)';
+  return 'oklch(0.975 0.055 100)';
 }
 
 /** The most any item can earn: a fully warm routine with every star of Friction, the first thing done in its area. */
