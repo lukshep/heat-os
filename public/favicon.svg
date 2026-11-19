@@ -1,10 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
     <radialGradient id="ember">
-      <stop offset="0" stop-color="#fff1c2" />
-      <stop offset="0.25" stop-color="#ffb347" />
-      <stop offset="0.5" stop-color="#f0602a" />
-      <stop offset="0.7" stop-color="#8a2612" />
+      <stop offset="0" stop-color="#fdf9d2" />
+      <stop offset="0.14" stop-color="#fbd950" />
+      <stop offset="0.26" stop-color="#f98f2b" />
+      <stop offset="0.38" stop-color="#ed4952" />
+      <stop offset="0.48" stop-color="#c1319d" />
+      <stop offset="0.58" stop-color="#792fb5" />
+      <stop offset="0.69" stop-color="#443d96" />
+      <stop offset="0.82" stop-color="#281f67" />
       <stop offset="1" stop-color="#121212" />
     </radialGradient>
   </defs>

@@ -31,7 +31,8 @@ The order is engine first, numbers second, product UI third. Nothing in the prod
 | M20 | Retune: an even area ladder, stronger stars, rings up to the Surge peak | Deployed 2026-11-15; not yet tried on an iPhone |
 | M21 | The gradient along the edge line, and a Surge sweep | Deployed 2026-11-15; not yet tried on an iPhone |
 | M22 | Task details: a description, subtasks and a panel | Deployed 2026-11-16; not yet tried on an iPhone |
-| M23 | A steel gradient | Deployed 2026-11-18; not yet tried on an iPhone |
+| M23 | A steel gradient | Deployed 2026-11-18; replaced by M24 |
+| M24 | A thermal camera's gradient, and an icon to match | Built 2026-11-19; not yet deployed |
 
 The first prototype is M1–M3.
 
@@ -526,6 +527,18 @@ Asked for on 2026-11-18, and chosen from a mockup of Today beside the old gradie
 
 Verified: unit tests for `heatColor` (blue-grey at the cold end; every colour either nearly grey or between red and yellow; lighter all the way from the red glow up; paler beyond a full gauge; held at both ends). Not tried on an iPhone, where the thing to judge is whether the cool reds still read against the dark background.
 
+### M24 — A thermal camera's gradient, and an icon to match
+
+Asked for on 2026-11-19, a day after M23, with a thermogram as the reference: back to a gradient like the one before M23, through violet and magenta, but with the look of a thermal camera's palette (decision 62). Only the colour stops in `src/ui/temperature.ts` and the icon changed. No change to saved data, scoring or `DEFAULT_CONFIG`, so there is no tuning-log entry.
+
+- **The stops.** Deep indigo (0), violet (0.28), magenta (0.5), crimson (0.68), orange (0.84), bright yellow at a full gauge, and a pale white-hot yellow at the Surge peak. Lightness rises the whole way, so hotter always reads brighter. Against the gradient before M23, the cold end is a saturated indigo rather than a muted slate, and magenta takes the middle, where red was.
+- **How the rings look.** A plain first task (0.64) is between magenta and crimson, a second in its area (0.58) magenta, stars and warmth take a ring through orange towards yellow, and only the hottest reach the pale end.
+- **Back to climbing hue.** With no grey stop, M23's rule for one (`hueBetween`) is gone, and hue climbs past 360 as it did before, so the path never doubles back through green.
+- **In gamut.** Every colour fits sRGB. Chroma at a full gauge is 0.155, since the stretch from orange to yellow left the gamut at 0.165.
+- **The icon** (`scripts/make-icons.mjs`, `public/favicon.svg`) is a hot spot on a thermal camera in the gradient's own colours: white-hot at the centre, then yellow, orange, crimson, magenta and violet, with an indigo halo fading into the background. It was an orange ember.
+
+Verified: unit tests for `heatColor` (deep indigo at the cold end; every hue indigo through magenta or red through yellow, never blue or green; magenta in the middle; lighter all the way; yellow at a full gauge and paler beyond; held at both ends).
+
 ### Later, not planned in detail
 
 Cloud sync, routine pause, notifications, reordering areas, reordering subtasks.
@@ -594,7 +607,8 @@ Cloud sync, routine pause, notifications, reordering areas, reordering subtasks.
 | 58 | An item's settings live in a panel that rises from the bottom, not under its row | Decided 2026-11-16 |
 | 59 | A routine's subtask ticks belong to the date it is on and clear by themselves when the next opens | Decided 2026-11-16 |
 | 60 | Subtasks live inside their item, like a routine's days, not as records with their own `createdAt`, `updatedAt` and `deletedAt` | Decided 2026-11-16 |
-| 61 | The temperature gradient follows heated steel: blue-grey, grey, dull red, cherry, orange, lemon, yellow, white-hot. It never passes through violet or pink | Decided 2026-11-18; replaces the slate, violet and red gradient |
+| 61 | The temperature gradient follows heated steel: blue-grey, grey, dull red, cherry, orange, lemon, yellow, white-hot. It never passes through violet or pink | Decided 2026-11-18; replaced by 62 |
+| 62 | The temperature gradient follows a thermal camera's palette: indigo, violet, magenta, crimson, orange, yellow, white-hot. The app icon is a hot spot in the same colours | Decided 2026-11-19; replaces 61 |
 
 ## Tuning log
 

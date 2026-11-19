@@ -262,13 +262,13 @@ Colour is recomputed whenever the day's completions change, so every open task a
 - Friction or a routine's warmth always shows: the item is a step warmer than the plain ones beside it, by the same step wherever it falls in its area
 - the hottest ring is still the item that would add the most HEAT, since at any one moment HEAT scales every item's gain by the same factor
 
-The gradient follows steel as it is heated: cold blue-grey, a dull red glow, cherry, orange and lemon, to a bright yellow at a full gauge and a pale, white-hot yellow at the Surge peak. It never passes through violet or pink. The cold end fades to plain grey before the red begins, so the change of hue is never seen, and from there it only gets lighter.
+The gradient follows a thermal camera's palette: deep indigo, through violet, magenta, crimson and orange, to a bright yellow at a full gauge and a pale, white-hot yellow at the Surge peak. It gets lighter all the way and never passes through blue or green. The app icon is a hot spot in the same colours.
 
 The edge line uses the same gradient for HEAT itself, reaching yellow at 100 and the bright pale yellow at 120 in Surge. Only the hottest rings share that pale end. A ring's glow stops growing at the yellow of a full gauge, so the hottest rings look paler, not bigger.
 
 ### Surge on screen
 
-Below 100 the line grows anticlockwise round the edge, down the left side first, and a full loop is 100. It carries the whole gradient along its length: cold steel grey at the top centre, glowing dull red, then cherry, orange and lemon to yellow where the loop closes, so the further round it reaches, the warmer its leading end, which is always the colour of HEAT now. Its leading end is a short stretch lit close to white, as wide as the line and no wider. A gain lights the line for a moment in its own colours.
+Below 100 the line grows anticlockwise round the edge, down the left side first, and a full loop is 100. It carries the whole gradient along its length: deep indigo at the top centre, warming through violet, magenta, crimson and orange to yellow where the loop closes, so the further round it reaches, the warmer its leading end, which is always the colour of HEAT now. Its leading end is a short stretch lit close to white, as wide as the line and no wider. A gain lights the line for a moment in its own colours.
 
 Going over 100 plays the sweep: a loop the colour of HEAT runs round from the top centre in the same direction, as wide as the line, easing in and out over 1.7 seconds. Its bright tip fades over the last stretch, so the loop closes without a jump, and the gradient beneath it then goes. It plays only at the moment HEAT goes over 100. Opening the app already in Surge shows the closed loop with no sweep, and falling back to 100 or below brings the gradient back, so the next crossing plays it again.
 

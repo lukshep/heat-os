@@ -1,5 +1,7 @@
-// Draws the app icon (a glowing ember on the app's dark background) and writes the PNG sizes
-// the manifest and iOS need. Run with `node scripts/make-icons.mjs` after changing the design.
+// Draws the app icon (a hot spot on a thermal camera, on the app's dark background) and writes
+// the PNG sizes the manifest and iOS need. Its colours are the stops of the temperature gradient
+// in src/ui/temperature.ts, hottest at the centre. Keep public/favicon.svg in step with it.
+// Run with `node scripts/make-icons.mjs` after changing the design.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,11 +12,15 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const BACKGROUND = [0x12, 0x12, 0x12];
 /** Colour by distance from the centre, as a share of the ember's radius. */
 const RAMP = [
-  [0.0, [0xff, 0xf1, 0xc2]],
-  [0.35, [0xff, 0xb3, 0x47]],
-  [0.7, [0xf0, 0x60, 0x2a]],
-  [1.0, [0x8a, 0x26, 0x12]],
-  [1.45, BACKGROUND],
+  [0.0, [0xfd, 0xf9, 0xd2]], // white-hot
+  [0.2, [0xfb, 0xd9, 0x50]], // yellow
+  [0.38, [0xf9, 0x8f, 0x2b]], // orange
+  [0.55, [0xed, 0x49, 0x52]], // crimson
+  [0.7, [0xc1, 0x31, 0x9d]], // magenta
+  [0.85, [0x79, 0x2f, 0xb5]], // violet
+  [1.0, [0x44, 0x3d, 0x96]], // indigo
+  [1.2, [0x28, 0x1f, 0x67]],
+  [1.5, BACKGROUND],
 ];
 /** Ember radius as a share of the icon's width; small enough to survive a maskable crop. */
 const RADIUS = 0.3;

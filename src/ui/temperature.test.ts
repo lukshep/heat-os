@@ -16,26 +16,27 @@ function oklch(color: string): { lightness: number; chroma: number; hue: number 
 const samples = Array.from({ length: 121 }, (_, index) => oklch(heatColor(index / 100)));
 
 describe('heatColor', () => {
-  it('starts as cold blue-grey', () => {
+  it('starts as deep indigo', () => {
     const cold = oklch(heatColor(0));
-    expect(cold.chroma).toBeLessThan(0.03);
-    expect(cold.hue).toBeGreaterThan(220);
-    expect(cold.hue).toBeLessThan(270);
+    expect(cold.chroma).toBeGreaterThan(0.1);
+    expect(cold.hue).toBeGreaterThan(270);
+    expect(cold.hue).toBeLessThan(295);
   });
 
-  it('never passes through violet or pink: a colour is either nearly grey or red to yellow', () => {
+  it('runs through violet, magenta and red to yellow, never through blue or green', () => {
     for (const sample of samples) {
-      if (sample.chroma <= 0.025) continue;
-      expect(sample.hue).toBeGreaterThanOrEqual(20);
-      expect(sample.hue).toBeLessThanOrEqual(110);
+      expect(sample.hue >= 270 || sample.hue <= 110).toBe(true);
     }
+    expect(oklch(heatColor(0.5)).hue).toBeGreaterThan(320);
   });
 
-  it('only gets lighter once it starts to glow, and is yellow at a full gauge', () => {
-    for (let index = 35; index < samples.length; index++) {
+  it('gets lighter all the way, and is yellow at a full gauge', () => {
+    for (let index = 1; index < samples.length; index++) {
       expect(samples[index]!.lightness).toBeGreaterThanOrEqual(samples[index - 1]!.lightness);
     }
-    expect(oklch(heatColor(1)).hue).toBeGreaterThan(85);
+    const full = oklch(heatColor(1));
+    expect(full.hue).toBeGreaterThan(85);
+    expect(full.hue).toBeLessThan(110);
   });
 
   it('pales towards white beyond a full gauge', () => {
